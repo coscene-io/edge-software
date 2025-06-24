@@ -90,6 +90,10 @@ show_progress() {
   local current=$1
   local total=$2
   local task=$3
+  if [ "${total}" -eq 0 ]; then
+    echo -e "${BLUE}[Progress]${NC} ${task}: ${current}/0 (N/A)"
+    return
+  fi
   local percent=$((current * 100 / total))
   echo -e "${BLUE}[Progress]${NC} ${task}: ${current}/${total} (${percent}%)"
 }
@@ -242,6 +246,17 @@ total_downloads=$((total_downloads + ${#SUPPORT_COLISTENER_ARCH[@]} * ${#SUPPORT
 total_downloads=$((total_downloads + ${#SUPPORT_COLISTENER_ARCH[@]} * ${#SUPPORT_ROS_VERSION[@]} * ${#SUPPORT_ROS_DISTRO[@]}))  # cobridge
 current_download=0
 
+# Debug information
+if [ "${VERBOSE}" = "true" ]; then
+  log_info "Total downloads calculated: ${total_downloads}"
+  log_info "SUPPORT_MESH_ARCH: ${#SUPPORT_MESH_ARCH[@]} items"
+  log_info "SUPPORT_OS: ${#SUPPORT_OS[@]} items"
+  log_info "SUPPORT_COS_ARCH: ${#SUPPORT_COS_ARCH[@]} items"
+  log_info "SUPPORT_COLISTENER_ARCH: ${#SUPPORT_COLISTENER_ARCH[@]} items"
+  log_info "SUPPORT_ROS_VERSION: ${#SUPPORT_ROS_VERSION[@]} items"
+  log_info "SUPPORT_ROS_DISTRO: ${#SUPPORT_ROS_DISTRO[@]} items"
+fi
+
 # Download mesh and trzsz
 log_info "Downloading colink and Trzsz binaries..."
 for arch in "${SUPPORT_MESH_ARCH[@]}"; do
@@ -254,13 +269,13 @@ for arch in "${SUPPORT_MESH_ARCH[@]}"; do
   mesh_download_url=${MESH_BASE_URL}/colink/v${COLINK_VERSION}/colink-${arch}
   trzsz_download_url=${MESH_BASE_URL}/trzsz/v${TRZSZ_VERSION}/trzsz_${TRZSZ_VERSION}_linux_${arch}.tar.gz
 
-  ((current_download++))
+  current_download=$((current_download + 1))
   show_progress ${current_download} ${total_downloads} "Downloading Colink"
   if ! download_with_retry "${mesh_download_url}" "${mesh_folder}/colink-${arch}"; then
     continue
   fi
 
-  ((current_download++))
+  current_download=$((current_download + 1))
   show_progress ${current_download} ${total_downloads} "Downloading Trzsz"
   if ! download_with_retry "${trzsz_download_url}" "${trzsz_folder}/trzsz_${TRZSZ_VERSION}_linux_${arch}.tar.gz"; then
     continue
@@ -277,13 +292,13 @@ for os in "${SUPPORT_OS[@]}"; do
     cos_download_url=${COS_BASE_URL}/${COS_VERSION}/${os}-${arch}.gz
     cos_metadata_url=${COS_BASE_URL}/${COS_VERSION}/${os}-${arch}.json
 
-    ((current_download++))
+    current_download=$((current_download + 1))
     show_progress ${current_download} ${total_downloads} "Downloading COS"
     if ! download_with_retry "${cos_download_url}" "${cos_folder}/${os}-${arch}.gz"; then
       continue
     fi
 
-    ((current_download++))
+    current_download=$((current_download + 1))
     show_progress ${current_download} ${total_downloads} "Downloading COS metadata"
     if ! download_with_retry "${cos_metadata_url}" "${cos_folder}/${os}-${arch}.json"; then
       continue
@@ -293,17 +308,17 @@ for os in "${SUPPORT_OS[@]}"; do
     if [ "${arch}" == "arm" ]; then
       log_info "Downloading cgroup binaries for ARM..."
       
-      ((current_download++))
+      current_download=$((current_download + 1))
       show_progress ${current_download} ${total_downloads} "Downloading cgroup-bin"
       cgroup_bin_download_url=${MESH_BASE_URL}/cgroup_bin/${arch}/cgroup_bin.deb
       download_with_retry "${cgroup_bin_download_url}" "${cos_folder}/cgroup_bin.deb" "false"
 
-      ((current_download++))
+      current_download=$((current_download + 1))
       show_progress ${current_download} ${total_downloads} "Downloading cgroup-lite"
       cgroup_lite_download_url=${MESH_BASE_URL}/cgroup_bin/${arch}/cgroup_lite.deb
       download_with_retry "${cgroup_lite_download_url}" "${cos_folder}/cgroup_lite.deb" "false"
 
-      ((current_download++))
+      current_download=$((current_download + 1))
       show_progress ${current_download} ${total_downloads} "Downloading libcgroup"
       libcgroup_download_url=${MESH_BASE_URL}/cgroup_bin/${arch}/libcgroup1.deb
       download_with_retry "${libcgroup_download_url}" "${cos_folder}/libcgroup1.deb" "false"
@@ -321,7 +336,7 @@ for arch in "${SUPPORT_COLISTENER_ARCH[@]}"; do
 
       colistener_download_url=${COLISTENER_BASE_URL}/${ros_distro}/main/binary-${arch}/ros-${ros_version}-colistener_${COLISTENER_VERSION}${ros_distro}_${arch}.deb
 
-      ((current_download++))
+      current_download=$((current_download + 1))
       show_progress ${current_download} ${total_downloads} "Downloading Colistener"
       if ! download_with_retry "${colistener_download_url}" "${colistener_folder}/colistener_${ros_version}_${ros_distro}_${arch}.deb"; then
         continue
@@ -340,7 +355,7 @@ for arch in "${SUPPORT_COLISTENER_ARCH[@]}"; do
 
       cobridge_download_url=${COLISTENER_BASE_URL}/${ros_distro}/main/binary-${arch}/ros-${ros_version}-cobridge_${COBRIDGE_VERSION}${ros_distro}_${arch}.deb
 
-      ((current_download++))
+      current_download=$((current_download + 1))
       show_progress ${current_download} ${total_downloads} "Downloading cobridge"
       if ! download_with_retry "${cobridge_download_url}" "${cobridge_folder}/cobridge_${ros_version}_${ros_distro}_${arch}.deb"; then
         continue
