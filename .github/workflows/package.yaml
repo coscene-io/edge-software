@@ -26,7 +26,7 @@ jobs:
       - name: Build Tar gz file
         run: |
           chmod +x script/package.sh
-          script/package.sh --cos_version=${{ inputs.cosVersion }}
+          script/package.sh --cos_version=${{ inputs.cosVersion }} --output_dir=$GITHUB_WORKSPACE --verbose
 
       - name: Upload Tar gz file
         uses: tvrcgo/oss-action@master
@@ -36,11 +36,11 @@ jobs:
           region: oss-cn-hangzhou
           bucket: coscene-download
           assets: |
-            /home/runner/cos_binaries.tar.gz:/cosbinary/tar/${{ inputs.cosVersion }}/cos_binaries.tar.gz
+            /home/runner/work/edge-software/edge-software/cos_binaries.tar.gz:/cosbinary/tar/${{ inputs.cosVersion }}/cos_binaries.tar.gz
 
       - name: Upload to S3
         run: |
-          aws s3 cp /home/runner/cos_binaries.tar.gz s3://coscene-download/cosbinary/tar/${{ inputs.cosVersion }}/cos_binaries.tar.gz
+          aws s3 cp $GITHUB_WORKSPACE/cos_binaries.tar.gz s3://coscene-download/cosbinary/tar/${{ inputs.cosVersion }}/cos_binaries.tar.gz
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.S3_ARTIFACTS_ACCESS_KEY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.S3_ARTIFACTS_ACCESS_SECRET }}
