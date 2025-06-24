@@ -36,7 +36,7 @@ jobs:
           region: oss-cn-hangzhou
           bucket: coscene-download
           assets: |
-            cos_binaries.tar.gz:/cosbinary/tar/${{ inputs.cosVersion }}/cos_binaries.tar.gz
+            /home/runner/work/edge-software/edge-software/cos_binaries.tar.gz:/cosbinary/tar/${{ inputs.cosVersion }}/cos_binaries.tar.gz
 
       - name: Upload to S3
         run: |
