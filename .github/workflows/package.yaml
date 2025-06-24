@@ -26,7 +26,7 @@ jobs:
       - name: Build Tar gz file
         run: |
           chmod +x script/package.sh
-          script/package.sh --cos_version=${{ inputs.cosVersion }}
+          script/package.sh --cos_version=${{ inputs.cosVersion }} --output_dir=$GITHUB_WORKSPACE
 
       - name: Upload Tar gz file
         uses: tvrcgo/oss-action@master
