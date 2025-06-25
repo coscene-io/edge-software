@@ -26,6 +26,7 @@ jobs:
 
   package-zip-file:
     runs-on: ubuntu-latest
+    needs: check
     permissions:
       contents: write
 
@@ -52,11 +53,13 @@ jobs:
           VERSION: ${{ needs.check.outputs.version }}
         run: |
           chmod +x script/package.sh
-          script/package.sh --release_version=${{ VERSION }} --output_dir=$GITHUB_WORKSPACE --verbose
+          script/package.sh --release_version=$VERSION --output_dir=$GITHUB_WORKSPACE --verbose
 
       - name: Upload Tar gz beta file
         if: env.IS_RELEASE == 'false'
         uses: tvrcgo/oss-action@master
+        env:
+          VERSION: ${{ needs.check.outputs.version }}
         with:
           key-id: ${{ secrets.OSS_ARTIFACTS_ACCESS_KEY }}
           key-secret: ${{ secrets.OSS_ARTIFACTS_ACCESS_SECRET }}
@@ -64,7 +67,7 @@ jobs:
           bucket: coscene-download
           assets: |
             /home/runner/work/edge-software/edge-software/cos_binaries.tar.gz:/cosbinary/tar/beta/cos_binaries.tar.gz
-            /home/runner/work/edge-software/edge-software/cos_binaries.tar.gz:/cosbinary/tar/${{ VERSION }}/cos_binaries.tar.gz
+            /home/runner/work/edge-software/edge-software/cos_binaries.tar.gz:/cosbinary/tar/${{ env.VERSION }}/cos_binaries.tar.gz
 
       - name: Upload Tar gz release file
         if: env.IS_RELEASE == 'true'
@@ -78,11 +81,11 @@ jobs:
           bucket: coscene-download
           assets: |
             /home/runner/work/edge-software/edge-software/cos_binaries.tar.gz:/cosbinary/tar/latest/cos_binaries.tar.gz
-            /home/runner/work/edge-software/edge-software/cos_binaries.tar.gz:/cosbinary/tar/${{ VERSION }}/cos_binaries.tar.gz
+            /home/runner/work/edge-software/edge-software/cos_binaries.tar.gz:/cosbinary/tar/${{ env.VERSION }}/cos_binaries.tar.gz
 
       - name: Upload to S3
         run: |
-          aws s3 cp $GITHUB_WORKSPACE/cos_binaries.tar.gz s3://coscene-download/cosbinary/tar/${{ VERSION }}/cos_binaries.tar.gz
+          aws s3 cp $GITHUB_WORKSPACE/cos_binaries.tar.gz s3://coscene-download/cosbinary/tar/$VERSION/cos_binaries.tar.gz
           if [ "${{ env.IS_RELEASE }}" == "true" ]; then
             aws s3 cp $GITHUB_WORKSPACE/cos_binaries.tar.gz s3://coscene-download/cosbinary/tar/latest/cos_binaries.tar.gz
           else
