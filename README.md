@@ -1,6 +1,7 @@
 # edge-software
 本repo提供刻行时空全量端侧软件的安装包，并提供版本号查询能力。 用户可以根据自身需求，对刻行端侧软件进行安装并完成版本校验。
 
+
 ## 如何使用
 
 1. 下载repo中的 install.sh 文件，以及 [cos_binaries.tar.gz](https://github.com/coscene-io/edge-software/releases/download/v0.9.0/cos_binaries.tar.gz) 软件包
@@ -59,3 +60,17 @@ no version file was found.
 release_version: v1.0.0
 ```
 进行校验。
+
+## 配置启动文件
+```bash
+  colink:  无需单独配置
+  cos: 无需单独配置
+  colistener_version:  #请务必在启动前先 source 您的 ros 工作空间环境变量。
+     Ros1： roslaunch colistener colistener.launch 
+     Ros2： ros2 launch colistener colistener.launch.xml   
+  cobridge:  #请务必在启动前先 source 您的 ros 工作空间环境变量。
+     Ros1： roslaunch cobridge cobridge.launch
+     Ros2： ros2 launch cobridge cobridge_launch.xml   
+  trzsz：无需单独配置
+```
+启动程序也可封装到您自己的启动脚本中
