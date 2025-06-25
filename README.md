@@ -1,4 +1,29 @@
 # edge-software
+本repo提供刻行时空全量端侧软件的安装包，并提供版本依赖。 用户可以根据自身需求，对刻行端侧软件进行安装并完成版本校验。
+
+## 如何使用
+
+1. 下载repo中的 install.sh 文件，以及 [cos_binaries.tar.gz](/home/runner/work/edge-software/edge-software/cos_binaries.tar.gz) 软件包
+2. 使用如下命令进行安装： 
+   ```bash
+   ./install.sh --use_local=./cos_binaries.tar.gz \
+       --mod="default" \
+       --org_slug="coscene-lark" \
+       --server_url="https://openapi.staging.coscene.cn" \
+       --coLink_endpoint="https://coordinator.staging.coscene.cn/api" \
+       --coLink_network="cf746e23-3210-4b8f-bdfa-fb771d1ac87c" \
+       --sn_file="/home/just2004docker/Downloads/example.yaml" \
+       --sn_field="serial_num" \
+       # --remove_config  注意：此参数仅适用，用户需要强制重新安装机器的端侧软件，启用此参数，重新安装后，机器人需要在刻行时空平台重新准入。请谨慎使用！
+   ```
+   
+   以上命令中的 parameter 可以在 coscene 网站的 “组织设置” -> “设备” 中获取，实际使用时请根据
+   ![设备](./img/add-device.png)
+   
+   ![安装脚本](./img/install-cmd.png)
+    
+3. 根据用户的实际需求，可将此命令封装成适合您的安装脚本或程序。 
+
 
 ## 获取当前已安装的组件版本
 ```bash
@@ -29,25 +54,8 @@ assemblies:
 no version file was found.
 ```
 
-## 安装 coscene 组件.
-
-1. 下载repo中的 install.sh 文件，以及 [cos_binaries.tar.gz](/home/runner/work/edge-software/edge-software/cos_binaries.tar.gz) 软件包
-2. 安装 coscene 组件
-   ```bash
-   ./install.sh --use_local=./cos_binaries.tar.gz \
-       --mod="default" \
-       --org_slug="coscene-lark" \
-       --server_url="https://openapi.staging.coscene.cn" \
-       --coLink_endpoint="https://coordinator.staging.coscene.cn/api" \
-       --coLink_network="cf746e23-3210-4b8f-bdfa-fb771d1ac87c" \
-       --sn_file="/home/just2004docker/Downloads/example.yaml" \
-       --sn_field="serial_num" \
-       --remove_config
-   ```
-   
-   以上命令中的 parameter 可以在 coscene 网站的 “组织设置” -> “设备” 中获取。
-   ![设备](./img/add-device.png)
-   
-   ![安装脚本](./img/install-cmd.png)
-    
-3. 使用安装命令进行安装
+可根据实际情况，对刻行时空的软件版本进行校验。 刻行时空建议对 
+```bash
+release_version: v1.0.0
+```
+进行校验。
