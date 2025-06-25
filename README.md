@@ -3,7 +3,7 @@
 
 ## 如何使用
 
-1. 下载repo中的 install.sh 文件，以及 [cos_binaries.tar.gz](/home/runner/work/edge-software/edge-software/cos_binaries.tar.gz) 软件包
+1. 下载repo中的 install.sh 文件，以及 [cos_binaries.tar.gz](https://github.com/coscene-io/edge-software/releases/download/v0.9.0/cos_binaries.tar.gz) 软件包
 2. 使用如下命令进行安装： 
    ```bash
    ./install.sh --use_local=./cos_binaries.tar.gz \
