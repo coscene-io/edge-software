@@ -30,7 +30,7 @@ SCRIPT_VERSION="1.0.0"
 
 # Default values
 COLINK_VERSION="1.0.4"
-COS_VERSION="latest"
+COS_VERSION="v1.1.5"
 COLISTENER_VERSION="2.0.0-0"
 COBRIDGE_VERSION="1.0.9-0"
 TRZSZ_VERSION="1.1.6"
@@ -299,8 +299,8 @@ for os in "${SUPPORT_OS[@]}"; do
     cos_folder="${TEMP_DIR}/cos/${arch}"
     mkdir -p "${cos_folder}"
 
-    cos_download_url=${COS_BASE_URL}/${COS_VERSION}/${os}-${arch}.gz
-    cos_metadata_url=${COS_BASE_URL}/${COS_VERSION}/${os}-${arch}.json
+    cos_download_url=${COS_BASE_URL}/versions/${COS_VERSION}/${os}-${arch}.gz
+    cos_metadata_url=${COS_BASE_URL}/versions/${COS_VERSION}/${os}-${arch}.json
 
     current_download=$((current_download + 1))
     show_progress ${current_download} ${total_downloads} "Downloading COS"
