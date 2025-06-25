@@ -31,8 +31,6 @@ no version file was found.
 
 ## 安装 coscene 组件.
 
-1. 下载repo中的 install.sh 文件，以及 [release](https://github.com/coscene-io/edge-software/releases) 中对应版本的 Assert
+1. 下载repo中的 install.sh 文件，以及 [cos_binaries.tar.gz](/home/runner/work/edge-software/edge-software/cos_binaries.tar.gz) 软件包
 2. 根据[参考链接](https://docs.coscene.cn/docs/device/create-device#%E4%BD%BF%E7%94%A8%E7%A6%BB%E7%BA%BF%E5%AE%89%E8%A3%85%E5%8C%85%E6%B7%BB%E5%8A%A0)，获取安装脚本的参数。
 3. 使用安装命令进行安装
-
-   
