@@ -32,5 +32,22 @@ no version file was found.
 ## 安装 coscene 组件.
 
 1. 下载repo中的 install.sh 文件，以及 [cos_binaries.tar.gz](/home/runner/work/edge-software/edge-software/cos_binaries.tar.gz) 软件包
-2. 根据[参考链接](https://docs.coscene.cn/docs/device/create-device#%E4%BD%BF%E7%94%A8%E7%A6%BB%E7%BA%BF%E5%AE%89%E8%A3%85%E5%8C%85%E6%B7%BB%E5%8A%A0)，获取安装脚本的参数。
+2. 安装 coscene 组件
+   ```bash
+   ./install.sh --use_local=./cos_binaries.tar.gz \
+       --mod="default" \
+       --org_slug="coscene-lark" \
+       --server_url="https://openapi.staging.coscene.cn" \
+       --coLink_endpoint="https://coordinator.staging.coscene.cn/api" \
+       --coLink_network="cf746e23-3210-4b8f-bdfa-fb771d1ac87c" \
+       --sn_file="/home/just2004docker/Downloads/example.yaml" \
+       --sn_field="serial_num" \
+       --remove_config
+   ```
+   
+   以上命令中的 parameter 可以在 coscene 网站的 “组织设置” -> “设备” 中获取。
+   ![设备](./img/add-device.png)
+   
+   ![安装脚本](./img/install-cmd.png)
+    
 3. 使用安装命令进行安装
