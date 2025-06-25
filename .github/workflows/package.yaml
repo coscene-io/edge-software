@@ -3,21 +3,47 @@ name: Compile the offline installation package
 # Controls when the workflow will run
 on:
   # Allows you to run this workflow manually from the Actions tab
+  release:
+    types: [published]
+
   workflow_dispatch:
-    inputs:
-      cosVersion:
-        description: cos version
-        type: choice
-        options:
-          - latest
-          - beta
-        default: latest
 
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Get Version
+        id: get_version
+        run: |
+          echo $(git describe --always --tags --abbrev=8 --dirty)
+          echo "version=$(git describe --always --tags --abbrev=8 --dirty)" >> "$GITHUB_OUTPUT"
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+
   package-zip-file:
     runs-on: ubuntu-latest
+    needs: check
+    permissions:
+      contents: write
 
     steps:
+      - name: Check if version is release or beta
+        env:
+          VERSION: ${{ needs.check.outputs.version }}
+        run: |
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          if echo "$VERSION" | grep -q -E '^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$'; then
+            echo "IS_RELEASE=true" >> $GITHUB_ENV
+            echo "VERSION_TAG=latest" >> $GITHUB_ENV
+          else
+            echo "IS_RELEASE=false" >> $GITHUB_ENV
+            echo "VERSION_TAG=beta" >> $GITHUB_ENV
+          fi
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -26,9 +52,10 @@ jobs:
       - name: Build Tar gz file
         run: |
           chmod +x script/package.sh
-          script/package.sh --cos_version=${{ inputs.cosVersion }} --output_dir=$GITHUB_WORKSPACE --verbose
+          script/package.sh --release_version=${{ env.VERSION }} --output_dir=$GITHUB_WORKSPACE --verbose
 
-      - name: Upload Tar gz file
+      - name: Upload Tar gz beta file
+        if: env.IS_RELEASE == 'false'
         uses: tvrcgo/oss-action@master
         with:
           key-id: ${{ secrets.OSS_ARTIFACTS_ACCESS_KEY }}
@@ -36,12 +63,41 @@ jobs:
           region: oss-cn-hangzhou
           bucket: coscene-download
           assets: |
-            /home/runner/work/edge-software/edge-software/cos_binaries.tar.gz:/cosbinary/tar/${{ inputs.cosVersion }}/cos_binaries.tar.gz
+            /home/runner/work/edge-software/edge-software/cos_binaries.tar.gz:/cosbinary/tar/beta/cos_binaries.tar.gz
+            /home/runner/work/edge-software/edge-software/cos_binaries.tar.gz:/cosbinary/tar/${{ env.VERSION }}/cos_binaries.tar.gz
+
+      - name: Upload Tar gz release file
+        if: env.IS_RELEASE == 'true'
+        uses: tvrcgo/oss-action@master
+        with:
+          key-id: ${{ secrets.OSS_ARTIFACTS_ACCESS_KEY }}
+          key-secret: ${{ secrets.OSS_ARTIFACTS_ACCESS_SECRET }}
+          region: oss-cn-hangzhou
+          bucket: coscene-download
+          assets: |
+            /home/runner/work/edge-software/edge-software/cos_binaries.tar.gz:/cosbinary/tar/latest/cos_binaries.tar.gz
+            /home/runner/work/edge-software/edge-software/cos_binaries.tar.gz:/cosbinary/tar/${{ env.VERSION }}/cos_binaries.tar.gz
 
       - name: Upload to S3
-        run: |
-          aws s3 cp $GITHUB_WORKSPACE/cos_binaries.tar.gz s3://coscene-download/cosbinary/tar/${{ inputs.cosVersion }}/cos_binaries.tar.gz
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.S3_ARTIFACTS_ACCESS_KEY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.S3_ARTIFACTS_ACCESS_SECRET }}
           AWS_DEFAULT_REGION: 'us-east-1'
+        run: |
+          aws s3 cp $GITHUB_WORKSPACE/cos_binaries.tar.gz s3://coscene-download/cosbinary/tar/${{ env.VERSION }}/cos_binaries.tar.gz
+          if [ "${{ env.IS_RELEASE }}" == "true" ]; then
+            aws s3 cp $GITHUB_WORKSPACE/cos_binaries.tar.gz s3://coscene-download/cosbinary/tar/latest/cos_binaries.tar.gz
+          else
+            aws s3 cp $GITHUB_WORKSPACE/cos_binaries.tar.gz s3://coscene-download/cosbinary/tar/beta/cos_binaries.tar.gz
+          fi
+
+      - name: Upload to Release Assets
+        if: env.IS_RELEASE == 'true'
+        uses: actions/upload-release-asset@v1.0.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: /home/runner/work/edge-software/edge-software/cos_binaries.tar.gz
+          asset_name: cos_binaries.tar.gz
+          asset_content_type: application/gzip

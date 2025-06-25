@@ -30,10 +30,11 @@ SCRIPT_VERSION="1.0.0"
 
 # Default values
 COLINK_VERSION="1.0.4"
-COS_VERSION="latest"
+COS_VERSION="v1.1.5"
 COLISTENER_VERSION="2.0.0-0"
 COBRIDGE_VERSION="1.0.9-0"
 TRZSZ_VERSION="1.1.6"
+RELEASE_VERSION="unknown"
 OUTPUT_DIR="${HOME}"
 VERBOSE=false
 DRY_RUN=false
@@ -53,11 +54,12 @@ ${YELLOW}Options:${NC}
   --colistener_version=VERSION Set Colistener version (default: ${COLISTENER_VERSION})
   --cobridge_version=VERSION   Set Cobridge version (default: ${COBRIDGE_VERSION})
   --trzsz_version=VERSION      Set Trzsz version (default: ${TRZSZ_VERSION})
-  --output_dir=PATH           Set output directory (default: ${OUTPUT_DIR})
-  --verbose                   Enable verbose output
-  --dry-run                   Show what would be downloaded without actually downloading
-  -h, --help                  Show this help message
-  -v, --version               Show version information
+  --release_version=TAG        Set repository tag (default: ${RELEASE_VERSION})
+  --output_dir=PATH            Set output directory (default: ${OUTPUT_DIR})
+  --verbose                    Enable verbose output
+  --dry-run                    Show what would be downloaded without actually downloading
+  -h, --help                   Show this help message
+  -v, --version                Show version information
 
 ${YELLOW}Examples:${NC}
   ${SCRIPT_NAME} --cos_version=1.2.3
@@ -188,6 +190,10 @@ while test $# -gt 0; do
     TRZSZ_VERSION="${1#*=}"
     shift
     ;;
+  --release_version=*)
+    RELEASE_VERSION="${1#*=}"
+    shift
+    ;;
   --output_dir=*)
     OUTPUT_DIR="${1#*=}"
     shift
@@ -229,6 +235,7 @@ log_info "  Colink Version: ${COLINK_VERSION}"
 log_info "  Colistener Version: ${COLISTENER_VERSION}"
 log_info "  Cobridge Version: ${COBRIDGE_VERSION}"
 log_info "  Trzsz Version: ${TRZSZ_VERSION}"
+log_info "  Repository Tag: ${RELEASE_VERSION}"
 log_info "  Output Directory: ${OUTPUT_DIR}"
 log_info "  Verbose: ${VERBOSE}"
 log_info "  Dry Run: ${DRY_RUN}"
@@ -292,8 +299,8 @@ for os in "${SUPPORT_OS[@]}"; do
     cos_folder="${TEMP_DIR}/cos/${arch}"
     mkdir -p "${cos_folder}"
 
-    cos_download_url=${COS_BASE_URL}/${COS_VERSION}/${os}-${arch}.gz
-    cos_metadata_url=${COS_BASE_URL}/${COS_VERSION}/${os}-${arch}.json
+    cos_download_url=${COS_BASE_URL}/versions/${COS_VERSION}/${os}-${arch}.gz
+    cos_metadata_url=${COS_BASE_URL}/versions/${COS_VERSION}/${os}-${arch}.json
 
     current_download=$((current_download + 1))
     show_progress ${current_download} ${total_downloads} "Downloading COS"
@@ -388,6 +395,25 @@ for arch in "${SUPPORT_COLISTENER_ARCH[@]}"; do
     done
   fi
 done
+
+# Generate version.yaml file
+log_info "Generating version.yaml file..."
+VERSION_FILE="${TEMP_DIR}/version.yaml"
+
+cat > "${VERSION_FILE}" << EOF
+# coScene Edge Software Package Versions
+# Generated on: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+
+release_version: ${RELEASE_VERSION}
+assemblies:
+  colink_version: ${COLINK_VERSION}
+  cos_version: ${COS_VERSION}
+  colistener_version: ${COLISTENER_VERSION}
+  cobridge_version: ${COBRIDGE_VERSION}
+  trzsz_version: ${TRZSZ_VERSION}
+EOF
+
+log_success "Generated version.yaml file"
 
 # Skip packaging if dry run
 if [ "${DRY_RUN}" = "true" ]; then
