@@ -26,7 +26,11 @@ jobs:
       - name: Build Tar gz file
         run: |
           chmod +x script/package.sh
-          script/package.sh --cos_version=${{ inputs.cosVersion }} --output_dir=$GITHUB_WORKSPACE --verbose
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            script/package.sh --cos_version=${{ inputs.cosVersion }} --release_version=${{ github.ref_name }} --output_dir=$GITHUB_WORKSPACE --verbose
+          else
+            script/package.sh --cos_version=${{ inputs.cosVersion }} --output_dir=$GITHUB_WORKSPACE --verbose
+          fi
 
       - name: Upload Tar gz file
         uses: tvrcgo/oss-action@master

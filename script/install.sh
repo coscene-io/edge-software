@@ -48,8 +48,11 @@ error_handler() {
 
 # Cleanup function
 cleanup() {
+    if [ ! -d "$TEMP_DIR" ]; then
+        return
+    fi
     echo "Cleaning up temp directory $TEMP_DIR"
-    [[ -n "$TEMP_DIR" && -d "$TEMP_DIR" ]] && rm -rf "$TEMP_DIR"
+    rm -rf "$TEMP_DIR"
 }
 
 # Set up traps
@@ -152,6 +155,7 @@ usage: $0 [OPTIONS]
     --coLink_network        coLink network id, e.g. organization id, will skip if not provided
     --use_32bit             Use 32-bit version for cos
     --skip_verify_cert      Skip verify certificate when download files
+    --version               Show the version of the cos
 EOF
 }
 
@@ -269,6 +273,15 @@ while test $# -gt 0; do
   --skip_verify_cert)
     SKIP_VERIFY_CERT=1
     shift # past argument
+    ;;
+  --version)
+    VERSION_FILE="$(getent passwd "${USER:-$(whoami)}" | cut -d: -f6)/.local/state/cos/version.yaml"
+    if [ -f "$VERSION_FILE" ]; then
+      cat "$VERSION_FILE"
+    else
+      echo "no version file was found."
+    fi
+    exit 0
     ;;
   *)
     echo_error "unknown option: $1"
@@ -633,6 +646,7 @@ if [[ -n $USE_LOCAL ]]; then
     echo "ERROR: Failed to find cos binary or JSON file. Exiting."
     exit 1
   fi
+  mv "$TEMP_DIR/cos_binaries/version.yaml" "$COS_STATE_DIR/version.yaml"
 else
   mkdir -p "$TEMP_DIR/cos_binaries/cos"
   TMP_FILE="$TEMP_DIR/cos_binaries/cos/$OS-$ARCH.gz"
