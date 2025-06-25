@@ -12,6 +12,8 @@ on:
           - latest
           - beta
         default: latest
+  release:
+    types: [published]
 
 jobs:
   package-zip-file:
@@ -27,7 +29,7 @@ jobs:
         run: |
           chmod +x script/package.sh
           if [[ "${{ github.event_name }}" == "release" ]]; then
-            script/package.sh --cos_version=${{ inputs.cosVersion }} --release_version=${{ github.ref_name }} --output_dir=$GITHUB_WORKSPACE --verbose
+            script/package.sh --cos_version=latest --release_version=${{ github.ref_name }} --output_dir=$GITHUB_WORKSPACE --verbose
           else
             script/package.sh --cos_version=${{ inputs.cosVersion }} --output_dir=$GITHUB_WORKSPACE --verbose
           fi
