@@ -52,9 +52,13 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.S3_ARTIFACTS_ACCESS_SECRET }}
           AWS_DEFAULT_REGION: 'us-east-1'
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+      - name: Upload to Release Assets
+        if: github.event_name == 'release'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          name: cos_binaries_${{ inputs.cosVersion }}
-          path: /home/runner/work/edge-software/edge-software/cos_binaries.tar.gz
-          retention-days: 30
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: /home/runner/work/edge-software/edge-software/cos_binaries.tar.gz
+          asset_name: cos_binaries.tar.gz
+          asset_content_type: application/gzip
