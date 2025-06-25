@@ -511,7 +511,7 @@ EOF
   else
     echo "Skipping systemd or upstart service installation, just install coLink binary..."
   fi
-  echo "Successfully installed coLink."
+  echo_info "Successfully installed coLink."
 fi
 
 echo ""
@@ -832,6 +832,48 @@ EOF
 else
   echo "Skipping systemd service installation, just install cos binary..."
 fi
+
+get_ubuntu_distro() {
+  if [[ -f /etc/os-release ]]; then
+    source /etc/os-release
+    echo "$VERSION_CODENAME"
+  elif [[ -f /etc/lsb-release ]]; then
+    source /etc/lsb-release
+    echo "$DISTRIB_CODENAME"
+  else
+    echo "unknown"
+  fi
+}
+
+get_ros_distro() {
+  if [[ -n "${ROS_DISTRO:-}" ]]; then
+      echo "$ROS_DISTRO"
+  else
+      # Try to find ROS installation in /opt/ros
+      for ros_path in /opt/ros/*; do
+          if [[ -d "$ros_path" ]]; then
+              echo "$(basename "$ros_path")"
+              return 0
+          fi
+      done
+      echo "unknown"
+  fi
+}
+
+UBUNTU_DISTRO=$(get_ubuntu_distro)
+ROS_VERSION=$(get_ros_distro)
+echo ""
+echo "current ubuntu distro: ${UBUNTU_DISTRO}, ROS distro: ${ROS_VERSION}"
+
+echo ""
+echo "Start install cobridge..."
+COBRIDGE_DEB_FILE="ros-${ROS_VERSION}-cobridge_${UBUNTU_DISTRO}_${ARCH}.deb"
+sudo dpkg -i "$TEMP_DIR/cos_binaries/cobridge/${UBUNTU_DISTRO}/${ARCH}/${ROS_VERSION}/${COBRIDGE_DEB_FILE}"
+
+echo ""
+echo "Start install colistener..."
+COLISTENER_DEB_FILE="ros-${ROS_VERSION}-colistener_${UBUNTU_DISTRO}_${ARCH}.deb"
+sudo dpkg -i "$TEMP_DIR/cos_binaries/colistener/${UBUNTU_DISTRO}/${ARCH}/${ROS_VERSION}/${COLISTENER_DEB_FILE}"
 
 echo_info "Successfully installed cos."
 exit 0
