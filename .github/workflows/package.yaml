@@ -50,5 +50,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cos_binaries_${{ inputs.cosVersion }}
-          path: $GITHUB_WORKSPACE/cos_binaries.tar.gz
+          path: /home/runner/work/edge-software/edge-software/cos_binaries.tar.gz
           retention-days: 30
