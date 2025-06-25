@@ -45,3 +45,10 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.S3_ARTIFACTS_ACCESS_KEY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.S3_ARTIFACTS_ACCESS_SECRET }}
           AWS_DEFAULT_REGION: 'us-east-1'
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cos_binaries_${{ inputs.cosVersion }}
+          path: $GITHUB_WORKSPACE/cos_binaries.tar.gz
+          retention-days: 30
