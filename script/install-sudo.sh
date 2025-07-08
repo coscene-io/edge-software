@@ -389,10 +389,10 @@ if [[ ! " ${valid_extensions[*]} " =~ $extension ]]; then
 fi
 
 # Check if SN_FILE exists
-if [[ ! -f $SN_FILE ]]; then
-    echo_error "ERROR: sn file does not exist. Exiting."
-    exit 1
-fi
+# if [[ ! -f $SN_FILE ]]; then
+#     echo_error "ERROR: sn file does not exist. Exiting."
+#     exit 1
+# fi
 
 # Check if extension is not .txt and SN_FIELD is empty
 echo "extension is $extension"
