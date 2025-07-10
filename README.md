@@ -8,7 +8,7 @@
 2. 您的机器人本体上需要设置好 Ros 的环境变量，并提前 source
 
 ### 安装步骤
-1. 下载repo中的 /script/install.sh 文件并给这个文件添加可执行的权限，以及 [cos_binaries.tar.gz](https://github.com/coscene-io/edge-software/releases/download/v0.9.2/cos_binaries.tar.gz) 软件包
+1. 下载repo中的 /script/install.sh 文件并给这个文件添加可执行的权限，以及 [cos_binaries.tar.gz](https://github.com/coscene-io/edge-software/releases/download/v0.9.3/cos_binaries.tar.gz) 软件包
 2. 使用如下命令进行安装： 
    ```bash
    ./install.sh --use_local=./cos_binaries.tar.gz \
