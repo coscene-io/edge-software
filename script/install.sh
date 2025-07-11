@@ -134,11 +134,6 @@ ARTIFACT_BASE_URL=https://download.coscene.cn
 COLINK_DOWNLOAD_URL=${ARTIFACT_BASE_URL}/colink/v${COLINK_VERSION}/colink-${COLINK_ARCH}
 TRZSZ_DOWNLOAD_URL=${ARTIFACT_BASE_URL}/trzsz/v1.1.6/trzsz_1.1.6_linux_${COLINK_ARCH}.tar.gz
 
-# cgroup path
-GROUP_NAME="cos_cpu_limited"
-CPU_PERCENT=15
-CGROUP_PATH="/sys/fs/cgroup/cpu"
-
 help() {
   cat <<EOF
 usage: $0 [OPTIONS]
@@ -441,6 +436,14 @@ format() {
 if [ -e /usr/local/bin/colink ]; then
   echo "Previously installed version:"
   /usr/local/bin/colink -V
+fi
+
+if [[ $REMOVE_CONFIG -eq 1 ]]; then
+  echo "remove exists config file."
+  [ -f "/etc/virmesh.key" ] && sudo rm -f /etc/virmesh.key
+  [ -f "/etc/virmesh.pub" ] && sudo rm -f /etc/virmesh.pub
+  [ -f "/etc/colink.key" ] && sudo rm -f /etc/colink.key
+  [ -f "/etc/colink.pub" ] && sudo rm -f /etc/colink.pub
 fi
 
 # check coLink endpoint or mesh arch
