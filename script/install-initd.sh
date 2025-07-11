@@ -144,6 +144,8 @@ SKIP_VERIFY_CERT=0
 COLINK_ENDPOINT=""
 INSTALL_COLISTENER=0
 INSTALL_COBRIDGE=0
+HTTP_PROXY=""
+NO_PROXY="localhost,127.0.0.1,::1,.local,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
 
 COLINK_VERSION=1.0.4
 ARTIFACT_BASE_URL=https://download.coscene.cn
@@ -180,6 +182,7 @@ For systemd systems, please use install.sh instead.
     --skip_verify_cert      Skip verify certificate when download files
     --install_colistener    Install colistener component (default: false)
     --install_cobridge      Install cobridge component (default: false)
+    --http_proxy            Set HTTP proxy for cos service (e.g. http://proxy.example.com:8080)
     --version               Show the version of the cos
 EOF
 }
@@ -308,6 +311,10 @@ while test $# -gt 0; do
   --install_cobridge)
     INSTALL_COBRIDGE=1
     shift # past argument
+    ;;
+  --http_proxy=*)
+    HTTP_PROXY="${1#*=}"
+    shift # past argument=value
     ;;
   --version)
     VERSION_FILE="$(getent passwd "${USER:-$(whoami)}" | cut -d: -f6)/.local/state/cos/version.yaml"
@@ -731,6 +738,19 @@ if [[ $DISABLE_SERVICE -eq 0 ]]; then
     exec_command="exec cgexec -g cpu:$GROUP_NAME $COS_SHELL_BASE/bin/cos daemon --config-path=${COS_CONFIG_DIR}/config.yaml --log-dir=${COS_LOG_DIR}"
   fi
 
+  # Prepare environment variables for upstart service
+  ENV_VARS=""
+  if [[ -n "$HTTP_PROXY" ]]; then
+    echo "Setting HTTP proxy: $HTTP_PROXY"
+    echo "Setting NO_PROXY (default): $NO_PROXY"
+    ENV_VARS="env HTTP_PROXY=$HTTP_PROXY
+env HTTPS_PROXY=$HTTP_PROXY
+env http_proxy=$HTTP_PROXY
+env https_proxy=$HTTP_PROXY
+env NO_PROXY=$NO_PROXY
+env no_proxy=$NO_PROXY"
+  fi
+
   sudo tee /etc/init/cos.conf >/dev/null <<EOF
 description "coScout: Data Collector by coScene"
 author "coScene"
@@ -743,6 +763,8 @@ nice 19
 # Limit the start attempts
 respawn
 respawn limit 10 86400
+
+${ENV_VARS}
 
 pre-start script
   rm -rf $CUR_USER_HOME/.cache/coscene/onefile_*

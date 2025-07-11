@@ -126,6 +126,8 @@ SKIP_VERIFY_CERT=0
 COLINK_ENDPOINT=""
 INSTALL_COLISTENER=0
 INSTALL_COBRIDGE=0
+HTTP_PROXY=""
+NO_PROXY="localhost,127.0.0.1,::1,.local,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
 
 COLINK_VERSION=1.0.4
 ARTIFACT_BASE_URL=https://download.coscene.cn
@@ -159,6 +161,7 @@ usage: $0 [OPTIONS]
     --skip_verify_cert      Skip verify certificate when download files
     --install_colistener    Install colistener component (default: false)
     --install_cobridge      Install cobridge component (default: false)
+    --http_proxy            Set HTTP proxy for cos service (e.g. http://proxy.example.com:8080)
     --version               Show the version of the cos
 EOF
 }
@@ -191,16 +194,6 @@ download_file() {
     curl -SLko "$dest" "$url" || error_exit "Failed to download $url without verifying the certificate"
   else
     curl -SLo "$dest" "$url" || error_exit "Failed to download $url"
-  fi
-}
-
-check_cgroup_tools() {
-  if ! command -v cgcreate &>/dev/null; then
-    echo_error "Cannot install cgroup-tools automatically. Please install it manually 'apt-get install -y cgroup-tools'."
-    return 1
-  else
-    echo "cgroup-tools is installed."
-    return 0
   fi
 }
 
@@ -295,6 +288,10 @@ while test $# -gt 0; do
   --install_cobridge)
     INSTALL_COBRIDGE=1
     shift # past argument
+    ;;
+  --http_proxy=*)
+    HTTP_PROXY="${1#*=}"
+    shift # past argument=value
     ;;
   --version)
     VERSION_FILE="$(getent passwd "${USER:-$(whoami)}" | cut -d: -f6)/.local/state/cos/version.yaml"
@@ -691,6 +688,20 @@ if [[ $DISABLE_SERVICE -eq 0 ]]; then
 
     # Create system-level systemd service file
     echo "Creating cos.service systemd file..."
+    
+    # Prepare environment section for systemd service
+    ENV_SECTION=""
+    if [[ -n "$HTTP_PROXY" ]]; then
+      echo "Setting HTTP proxy: $HTTP_PROXY"
+      echo "Setting NO_PROXY (default): $NO_PROXY"
+      ENV_SECTION="Environment=HTTP_PROXY=$HTTP_PROXY
+Environment=HTTPS_PROXY=$HTTP_PROXY
+Environment=http_proxy=$HTTP_PROXY
+Environment=https_proxy=$HTTP_PROXY
+Environment=NO_PROXY=$NO_PROXY
+Environment=no_proxy=$NO_PROXY"
+    fi
+    
     sudo tee /etc/systemd/system/cos.service >/dev/null <<EOL
 [Unit]
 Description=coScout: Data Collector by coScene
@@ -704,6 +715,7 @@ User=$CUR_USER
 Group=$CUR_USER
 WorkingDirectory=$CUR_USER_HOME/.local/state/cos
 CPUQuota=10%
+${ENV_SECTION}
 ExecStart=$COS_SHELL_BASE/bin/cos daemon --config-path=${COS_CONFIG_DIR}/config.yaml --log-dir=${COS_LOG_DIR}
 SyslogIdentifier=cos
 RestartSec=60
