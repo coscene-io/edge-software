@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script is specifically designed for initd/upstart systems
+# For systemd systems, please use install-sudo.sh instead
 
 set -Eeuo pipefail
 
@@ -33,6 +35,17 @@ echo_error() {
 
 echo_info() {
     echo -e "${GREEN}$*${NC}"
+}
+
+# Check if this is not a systemd system
+check_upstart() {
+  if [[ "$(ps --no-headers -o comm 1 2>/dev/null)" == "systemd" ]]; then
+    echo_error "This script is designed for initd/upstart systems only."
+    echo_error "For systemd systems, please use install.sh instead."
+    return 1
+  else
+    return 0
+  fi
 }
 
 # Error handling function
@@ -58,6 +71,11 @@ cleanup() {
 # Set up traps
 trap 'error_handler ${LINENO} "$BASH_COMMAND" "$?"' ERR
 trap cleanup EXIT SIGINT SIGTERM
+
+# Check if this is an initd/upstart system
+if ! check_upstart; then
+    exit 1
+fi
 
 # check temp dir
 TEMP_DIR=$(mktemp -d)
@@ -141,6 +159,9 @@ help() {
   cat <<EOF
 usage: $0 [OPTIONS]
 
+This script is designed for initd/upstart systems only.
+For systemd systems, please use install.sh instead.
+
     --help                  Show this message
     --server_url            Api server url
     --project_slug          The slug of the project to upload to
@@ -148,7 +169,7 @@ usage: $0 [OPTIONS]
     --remove_config         Remove all config files, current device will be treated as a new device
     --beta                  Use beta version for cos
     --use_local             Use local binary file zip path e.g. /xx/path/cos_binaries.tar.gz
-    --disable_service       Disable systemd or upstart service installation
+    --disable_service       Disable upstart service installation
     --mod                   Select the mod to install - task, default or other mod (default is 'default')
     --sn_file               The file path of the serial number file, will skip if not provided
     --sn_field              The field name of the serial number, should be provided with sn_file, unique field to identify the device
@@ -203,6 +224,8 @@ check_cgroup_tools() {
     return 0
   fi
 }
+
+
 
 # get user input
 while test $# -gt 0; do
@@ -468,36 +491,11 @@ else
   chmod -R +x "$TEMP_DIR"/trzsz
   sudo mv -f "$TEMP_DIR"/trzsz/* /usr/local/bin/
   rm -rf "$TEMP_DIR"/trzsz.tar.gz
-  # check systemd or upstart service
+  
+  # install upstart service only
   if [[ $DISABLE_SERVICE -eq 0 ]]; then
-    if [[ "$(ps --no-headers -o comm 1 2>&1)" == "systemd" ]] && command -v systemctl 2>&1; then
-      echo "Installing systemd service..."
-      sudo tee /etc/systemd/system/colink.service >/dev/null <<EOF
-[Unit]
-Description=coLink Client Daemon
-
-[Service]
-WorkingDirectory=/etc
-ExecStart=/usr/local/bin/colink daemon --endpoint ${COLINK_ENDPOINT} --network ${COLINK_NETWORK} --allow-ssh
-Restart=always
-RestartSec=30
-
-[Install]
-WantedBy=multi-user.target
-EOF
-      sudo systemctl daemon-reload
-
-      echo "Starting coLink service..."
-      sudo systemctl is-active --quiet coLink && sudo systemctl stop coLink && sudo systemctl disable coLink && sudo rm -f /etc/systemd/system/coLink.service
-      sudo systemctl is-active --quiet virmesh && sudo systemctl stop virmesh && sudo systemctl disable virmesh && sudo rm -f /etc/systemd/system/virmesh.service
-
-      sudo systemctl is-active --quiet colink && sudo systemctl stop colink && sudo systemctl disable colink
-      sudo systemctl enable colink
-      sudo systemctl start colink
-      echo "Start coLink service done."
-    elif /sbin/init --version 2>&1 | grep -q upstart; then
-      echo "Installing upstart service..."
-      sudo tee /etc/init/colink.conf >/dev/null <<EOF
+    echo "Installing upstart service..."
+    sudo tee /etc/init/colink.conf >/dev/null <<EOF
 description "coLink Client Daemon"
 
 # Start the service when networking is up
@@ -525,19 +523,18 @@ script
 end script
 EOF
 
-      SERVICE_NAME="colink"
-      STATUS_OUTPUT=$(sudo initctl status "$SERVICE_NAME")
-      if echo "$STATUS_OUTPUT" | grep -q "start/running"; then
-        echo "$SERVICE_NAME is running. Stopping it now..."
-        sudo initctl stop "$SERVICE_NAME"
-        echo "$SERVICE_NAME has been stopped."
-      else
-        echo "$SERVICE_NAME is not running."
-      fi
-      sudo initctl start $SERVICE_NAME
+    SERVICE_NAME="colink"
+    STATUS_OUTPUT=$(sudo initctl status "$SERVICE_NAME")
+    if echo "$STATUS_OUTPUT" | grep -q "start/running"; then
+      echo "$SERVICE_NAME is running. Stopping it now..."
+      sudo initctl stop "$SERVICE_NAME"
+      echo "$SERVICE_NAME has been stopped."
+    else
+      echo "$SERVICE_NAME is not running."
     fi
+    sudo initctl start $SERVICE_NAME
   else
-    echo "Skipping systemd or upstart service installation, just install coLink binary..."
+    echo "Skipping upstart service installation, just install coLink binary..."
   fi
   echo_info "Successfully installed coLink."
 fi
@@ -711,85 +708,30 @@ else
     exit 1
 fi
 
-# check disable systemd, default will install cos.service
+# install upstart service only
 if [[ $DISABLE_SERVICE -eq 0 ]]; then
-  if [[ "$(ps --no-headers -o comm 1 2>&1)" == "systemd" ]] && command -v systemctl 2>&1; then
-    echo "Installing cos systemd service..."
+  echo "Installing cos upstart service..."
 
-    # Create system-level systemd service file
-    echo "Creating cos.service systemd file..."
-    sudo tee /etc/systemd/system/cos.service >/dev/null <<EOL
-[Unit]
-Description=coScout: Data Collector by coScene
-Documentation=https://github.com/coscene-io/coScout
-StartLimitBurst=10
-StartLimitIntervalSec=86400
+  if ! command -v cgcreate &>/dev/null; then
+    if [[ -n $USE_LOCAL  ]] && [[ $ARCH == "arm" ]]; then
+      echo "Installing cgroup-tools..."
+      sudo dpkg -i "$TEMP_DIR/cos_binaries/cos/$ARCH/libcgroup1.deb"
+      sudo dpkg -i "$TEMP_DIR/cos_binaries/cos/$ARCH/cgroup_lite.deb"
+      sudo dpkg -i "$TEMP_DIR/cos_binaries/cos/$ARCH/cgroup_bin.deb"
 
-[Service]
-Type=simple
-User=$CUR_USER
-Group=$CUR_USER
-WorkingDirectory=$CUR_USER_HOME/.local/state/cos
-CPUQuota=10%
-ExecStart=$COS_SHELL_BASE/bin/cos daemon --config-path=${COS_CONFIG_DIR}/config.yaml --log-dir=${COS_LOG_DIR}
-SyslogIdentifier=cos
-RestartSec=60
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-EOL
-    echo "Created cos.service systemd file: /etc/systemd/system/cos.service"
-
-    echo ""
-    echo "Starting cos service for $CUR_USER..."
-
-    echo "Reloading systemd daemon..."
-    sudo systemctl daemon-reload
-
-    echo "Checking if cos service is running..."
-    sudo systemctl is-active --quiet cos && sudo systemctl stop cos && sudo systemctl disable cos
-    
-    echo "Enabling cos service..."
-    sudo systemctl enable cos
-    
-    echo "Starting cos service..."
-    if sudo systemctl start cos; then 
-      echo "Cos service started successfully."
-    else
-      echo_error "Cos service failed to start."
-
-      echo_error "Checking service status for more details..."
-      sudo systemctl status cos || true
-      echo_error "Checking journal logs for more details..."
-      sudo journalctl -xe -u cos --no-pager | tail -n 50
-    fi
-    
-    echo ""
-    echo_info "🎉 Installation completed successfully , you can use 'tail -f ${COS_LOG_DIR}/cos.log' to check the logs."
-  elif /sbin/init --version 2>&1 | grep -q upstart; then
-    echo "Installing cos upstart service..."
-
-    if ! command -v cgcreate &>/dev/null; then
-      if [[ -n $USE_LOCAL  ]] && [[ $ARCH == "arm" ]]; then
-        echo "Installing cgroup-tools..."
-        sudo dpkg -i "$TEMP_DIR/cos_binaries/cos/$ARCH/libcgroup1.deb"
-        sudo dpkg -i "$TEMP_DIR/cos_binaries/cos/$ARCH/cgroup_lite.deb"
-        sudo dpkg -i "$TEMP_DIR/cos_binaries/cos/$ARCH/cgroup_bin.deb"
-
-        if ! command -v cgcreate &>/dev/null; then
-          echo_error "Failed to install cgroup-tools."
-          exit 1
-        fi
+      if ! command -v cgcreate &>/dev/null; then
+        echo_error "Failed to install cgroup-tools."
+        exit 1
       fi
     fi
+  fi
 
-    exec_command="exec $COS_SHELL_BASE/bin/cos daemon --config-path=${COS_CONFIG_DIR}/config.yaml --log-dir=${COS_LOG_DIR}"
-    if check_cgroup_tools; then
-      exec_command="exec cgexec -g cpu:$GROUP_NAME $COS_SHELL_BASE/bin/cos daemon --config-path=${COS_CONFIG_DIR}/config.yaml --log-dir=${COS_LOG_DIR}"
-    fi
+  exec_command="exec $COS_SHELL_BASE/bin/cos daemon --config-path=${COS_CONFIG_DIR}/config.yaml --log-dir=${COS_LOG_DIR}"
+  if check_cgroup_tools; then
+    exec_command="exec cgexec -g cpu:$GROUP_NAME $COS_SHELL_BASE/bin/cos daemon --config-path=${COS_CONFIG_DIR}/config.yaml --log-dir=${COS_LOG_DIR}"
+  fi
 
-    sudo tee /etc/init/cos.conf >/dev/null <<EOF
+  sudo tee /etc/init/cos.conf >/dev/null <<EOF
 description "coScout: Data Collector by coScene"
 author "coScene"
 
@@ -833,24 +775,23 @@ end script
 console log
 EOF
 
-    SERVICE_NAME="cos"
-    STATUS_OUTPUT=$(sudo initctl status "$SERVICE_NAME")
-    if echo "$STATUS_OUTPUT" | grep -q "start/running"; then
-      echo "$SERVICE_NAME is running. Stopping it now..."
-      sudo initctl stop "$SERVICE_NAME"
-      echo "$SERVICE_NAME has been stopped."
-    else
-      echo "$SERVICE_NAME is not running."
-    fi
-
-    echo "reload upstart configuration..."
-    sudo initctl reload-configuration
-    sudo initctl start $SERVICE_NAME
-
-    echo_info "🎉 Installation completed successfully, you can use 'tail -f ${COS_LOG_DIR}/cos.log' to check the logs."
+  SERVICE_NAME="cos"
+  STATUS_OUTPUT=$(sudo initctl status "$SERVICE_NAME")
+  if echo "$STATUS_OUTPUT" | grep -q "start/running"; then
+    echo "$SERVICE_NAME is running. Stopping it now..."
+    sudo initctl stop "$SERVICE_NAME"
+    echo "$SERVICE_NAME has been stopped."
+  else
+    echo "$SERVICE_NAME is not running."
   fi
+
+  echo "reload upstart configuration..."
+  sudo initctl reload-configuration
+  sudo initctl start $SERVICE_NAME
+
+  echo_info "🎉 Installation completed successfully, you can use 'tail -f ${COS_LOG_DIR}/cos.log' to check the logs."
 else
-  echo "Skipping systemd service installation, just install cos binary..."
+  echo "Skipping upstart service installation, just install cos binary..."
 fi
 
 # Install cobridge and colistener based on flags
@@ -903,4 +844,4 @@ if [[ $INSTALL_COLISTENER -eq 1 ]]; then
 fi
 
 echo_info "Successfully installed cos."
-exit 0
+exit 0 
