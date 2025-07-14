@@ -78,3 +78,28 @@ release_version: v1.0.0
   trzsz：无需单独配置
 ```
 启动程序也可封装到您自己的启动脚本中
+
+## 其他
+
+当您的机器处于内网，不能够直接访问外网，但是存在着统一的出口代理服务时，采集软件支持通过 --http_proxy 参数设置通过代理服务访问。安装参数如下
+
+```bash
+./install.sh --use_local=./cos_binaries.tar.gz \
+      --mod="default" \
+      --org_slug="coscene-lark" \
+      --server_url="https://openapi.staging.coscene.cn" \
+      --coLink_endpoint="https://coordinator.staging.coscene.cn/api" \
+      --coLink_network="cf746e23-3210-4b8f-bdfa-fb771d1ac87c" \
+      --sn_file="/home/just2004docker/Downloads/example.yaml" \
+      --sn_field="serial_num" \
+      # --remove_config  注意：此参数仅适用，用户需要强制重新安装机器的端侧软件，启用此参数，重新安装后，机器人需要在刻行时空平台重新准入。请谨慎使用！
+      --http_proxy=http://proxy
+```
+
+另外如果没有响应的代理软件，我们也提供了一个代理服务的安装，具体可以通过 [install-proxy.sh](./script/install-proxy.sh) 脚本安装。
+
+```bash
+./install-proxy.sh --listen_port=12345
+```
+
+其中 --listen_port=12345 参数用于指定代理服务的端口，建议使用大于 10000 以上的端口避免服务冲突。

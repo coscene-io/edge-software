@@ -113,7 +113,7 @@ LISTEN_PORT=""
 DISABLE_SERVICE=0
 CONFIG_FILE=""
 LOG_LEVEL="info"
-GITHUB_BASE_URL="https://github.com/nadoo/glider/releases/download"
+GITHUB_BASE_URL="https://download.coscene.cn/glider"
 
 help() {
   cat <<EOF
