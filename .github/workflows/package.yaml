@@ -1,3 +1,20 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 name: Compile the offline installation package
 
 # Controls when the workflow will run
@@ -65,6 +82,11 @@ jobs:
           assets: |
             /home/runner/work/edge-software/edge-software/cos_binaries.tar.gz:/cosbinary/tar/beta/cos_binaries.tar.gz
             /home/runner/work/edge-software/edge-software/cos_binaries.tar.gz:/cosbinary/tar/${{ env.VERSION }}/cos_binaries.tar.gz
+            script/install.sh:/cosbinary/script/beta/install.sh
+            script/install-proxy.sh:/cosbinary/script/beta/install-proxy.sh
+            script/install-initd.sh:/cosbinary/script/beta/install-initd.sh
+            script/uninstall.sh:/cosbinary/script/beta/uninstall.sh
+            script/device-check.sh:/cosbinary/script/beta/device-check.sh
 
       - name: Upload Tar gz release file
         if: env.IS_RELEASE == 'true'
@@ -77,6 +99,11 @@ jobs:
           assets: |
             /home/runner/work/edge-software/edge-software/cos_binaries.tar.gz:/cosbinary/tar/latest/cos_binaries.tar.gz
             /home/runner/work/edge-software/edge-software/cos_binaries.tar.gz:/cosbinary/tar/${{ env.VERSION }}/cos_binaries.tar.gz
+            script/install.sh:/cosbinary/script/latest/install.sh
+            script/install-proxy.sh:/cosbinary/script/latest/install-proxy.sh
+            script/install-initd.sh:/cosbinary/script/latest/install-initd.sh
+            script/uninstall.sh:/cosbinary/script/latest/uninstall.sh
+            script/device-check.sh:/cosbinary/script/latest/device-check.sh
 
       - name: Upload to S3
         env:
@@ -87,8 +114,20 @@ jobs:
           aws s3 cp $GITHUB_WORKSPACE/cos_binaries.tar.gz s3://coscene-download/cosbinary/tar/${{ env.VERSION }}/cos_binaries.tar.gz
           if [ "${{ env.IS_RELEASE }}" == "true" ]; then
             aws s3 cp $GITHUB_WORKSPACE/cos_binaries.tar.gz s3://coscene-download/cosbinary/tar/latest/cos_binaries.tar.gz
+
+            aws s3 cp script/install.sh s3://coscene-download/cosbinary/script/latest/install.sh
+            aws s3 cp script/install-proxy.sh s3://coscene-download/cosbinary/script/latest/install-proxy.sh
+            aws s3 cp script/install-initd.sh s3://coscene-download/cosbinary/script/latest/install-initd.sh
+            aws s3 cp script/uninstall.sh s3://coscene-download/cosbinary/script/latest/uninstall.sh
+            aws s3 cp script/device-check.sh s3://coscene-download/cosbinary/script/latest/device-check.sh
           else
             aws s3 cp $GITHUB_WORKSPACE/cos_binaries.tar.gz s3://coscene-download/cosbinary/tar/beta/cos_binaries.tar.gz
+
+            aws s3 cp script/install.sh s3://coscene-download/cosbinary/script/beta/install.sh
+            aws s3 cp script/install-proxy.sh s3://coscene-download/cosbinary/script/beta/install-proxy.sh
+            aws s3 cp script/install-initd.sh s3://coscene-download/cosbinary/script/beta/install-initd.sh
+            aws s3 cp script/uninstall.sh s3://coscene-download/cosbinary/script/beta/uninstall.sh
+            aws s3 cp script/device-check.sh s3://coscene-download/cosbinary/script/beta/device-check.sh
           fi
 
       - name: Upload to Release Assets
