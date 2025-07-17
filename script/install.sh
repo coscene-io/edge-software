@@ -291,6 +291,7 @@ while test $# -gt 0; do
     ;;
   --version)
     VERSION_FILE="$(getent passwd "${USER:-$(whoami)}" | cut -d: -f6)/.local/state/cos/version.yaml"
+    echo "read version from ${VERSION_FILE}"
     if [ -f "$VERSION_FILE" ]; then
       cat "$VERSION_FILE"
     else
@@ -796,8 +797,8 @@ if [[ $INSTALL_COBRIDGE -eq 1 ]] || [[ $INSTALL_COLISTENER -eq 1 ]]; then
   echo "current ubuntu distro: ${UBUNTU_DISTRO}, ROS distro: ${ROS_VERSION}"
 fi
 
-COLISTENER_VERSION=""
-COBRIDGE_VERSION=""
+COLISTENER_VERSION="none"
+COBRIDGE_VERSION="none"
 
 if [[ $INSTALL_COLISTENER -eq 1 ]]; then
   echo "Install coListener"
