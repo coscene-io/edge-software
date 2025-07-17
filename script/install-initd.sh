@@ -148,9 +148,10 @@ HTTP_PROXY=""
 NO_PROXY="localhost,127.0.0.1,::1,.local,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
 
 COLINK_VERSION=1.0.4
+TRZSZ_VERSION=1.1.6
 ARTIFACT_BASE_URL=https://download.coscene.cn
 COLINK_DOWNLOAD_URL=${ARTIFACT_BASE_URL}/colink/v${COLINK_VERSION}/colink-${COLINK_ARCH}
-TRZSZ_DOWNLOAD_URL=${ARTIFACT_BASE_URL}/trzsz/v1.1.6/trzsz_1.1.6_linux_${COLINK_ARCH}.tar.gz
+TRZSZ_DOWNLOAD_URL=${ARTIFACT_BASE_URL}/trzsz/v${TRZSZ_VERSION}/trzsz_${TRZSZ_VERSION}_linux_${COLINK_ARCH}.tar.gz
 
 # cgroup path
 GROUP_NAME="cos_cpu_limited"
@@ -486,7 +487,7 @@ else
 
   if [[ -n $USE_LOCAL ]]; then
     echo "Moving new trzsz binary..."
-    cp "$TEMP_DIR/cos_binaries/trzsz_tar/trzsz_1.1.6_linux_${COLINK_ARCH}.tar.gz" "$TEMP_DIR"/trzsz.tar.gz
+    cp "$TEMP_DIR/cos_binaries/trzsz_tar/trzsz_${TRZSZ_VERSION}_linux_${COLINK_ARCH}.tar.gz" "$TEMP_DIR"/trzsz.tar.gz
   else
     echo "Downloading new trzsz binary..."
     download_file "$TEMP_DIR"/trzsz.tar.gz $TRZSZ_DOWNLOAD_URL $SKIP_VERIFY_CERT
@@ -852,18 +853,46 @@ if [[ $INSTALL_COBRIDGE -eq 1 ]] || [[ $INSTALL_COLISTENER -eq 1 ]]; then
 fi
 
 if [[ $INSTALL_COBRIDGE -eq 1 ]]; then
-  echo ""
-  echo "Start install cobridge..."
-  COBRIDGE_DEB_FILE="ros-${ROS_VERSION}-cobridge_${UBUNTU_DISTRO}_${ARCH}.deb"
-  sudo dpkg -i "$TEMP_DIR/cos_binaries/cobridge/${UBUNTU_DISTRO}/${ARCH}/${ROS_VERSION}/${COBRIDGE_DEB_FILE}"
+  echo "Install coListener"
+  if [[ -n $USE_LOCAL ]]; then
+    COLISTENER_DEB_FILE="ros-${ROS_VERSION}-colistener_${UBUNTU_DISTRO}_${ARCH}.deb"
+    sudo dpkg -i "$TEMP_DIR/cos_binaries/colistener/${UBUNTU_DISTRO}/${ARCH}/${ROS_VERSION}/${COLISTENER_DEB_FILE}"
+  else
+    COLISTENER_VERSION="2.1.0-0"
+    COLISTENER_DEB_FILE="ros-${ROS_VERSION}-colistener_${COLISTENER_VERSION}${UBUNTU_DISTRO}_${ARCH}.deb"
+    COLISTENER_DOWNLOAD_URL="https://apt.coscene.cn/dists/${UBUNTU_DISTRO}/main/binary-${ARCH}/${COLISTENER_DEB_FILE}"
+    download_file "$TEMP_DIR"/colistener.deb $COLISTENER_DOWNLOAD_URL $SKIP_VERIFY_CERT
+    sudo dpkg -i "$TEMP_DIR"/colistener.deb
+  fi
 fi
 
 if [[ $INSTALL_COLISTENER -eq 1 ]]; then
-  echo ""
-  echo "Start install colistener..."
-  COLISTENER_DEB_FILE="ros-${ROS_VERSION}-colistener_${UBUNTU_DISTRO}_${ARCH}.deb"
-  sudo dpkg -i "$TEMP_DIR/cos_binaries/colistener/${UBUNTU_DISTRO}/${ARCH}/${ROS_VERSION}/${COLISTENER_DEB_FILE}"
+  echo "Install coBridge"
+  if [[ -n $USE_LOCAL ]]; then
+    COBRIDGE_DEB_FILE="ros-${ROS_VERSION}-cobridge_${UBUNTU_DISTRO}_${ARCH}.deb"
+    sudo dpkg -i "$TEMP_DIR/cos_binaries/cobridge/${UBUNTU_DISTRO}/${ARCH}/${ROS_VERSION}/${COBRIDGE_DEB_FILE}"
+  else
+    COBRIDGE_VERSION="1.1.0-0"
+    COBRIDGE_DEB_FILE="ros-${ROS_VERSION}-cobridge_${COBRIDGE_VERSION}${UBUNTU_DISTRO}_${ARCH}.deb"
+    COBRIDGE_DOWNLOAD_URL="https://apt.coscene.cn/dists/${UBUNTU_DISTRO}/main/binary-${ARCH}/${COBRIDGE_DEB_FILE}"
+    download_file "$TEMP_DIR"/cobridge.deb $COBRIDGE_DOWNLOAD_URL $SKIP_VERIFY_CERT
+    sudo dpkg -i "$TEMP_DIR"/cobridge.deb
+  fi
 fi
+
+VERSION_FILE="$COS_STATE_DIR/version.yaml"
+sudo tee "${VERSION_FILE}" > /dev/null << EOF
+# coScene Edge Software Package Versions
+# Generated on: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+
+release_version: online
+assemblies:
+  colink_version: ${COLINK_VERSION}
+  cos_version: ${VERSION}
+  colistener_version: ${COLISTENER_VERSION}
+  cobridge_version: ${COBRIDGE_VERSION}
+  trzsz_version: ${TRZSZ_VERSION}
+EOF
 
 echo_info "Successfully installed cos."
 exit 0 
