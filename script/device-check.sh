@@ -151,7 +151,10 @@ echo "测试下载速度..." && network_download_speed=$(speed_test_avg download
 echo "下载速度  | $network_download_speed"
 
 # echo "Measuring upload speed..." && network_upload_speed=$(speed_test_avg upload)
-echo "测试 ping 延迟..." && network_ping=$(ping -c 4 "${ping_test_endpoint}" | tail -1 | awk '{print $4}' | cut -d '/' -f 2)
+echo "测试 ping 延迟..." && network_ping=$(ping -c 4 "${ping_test_endpoint}" 2>/dev/null | tail -1 | awk '{print $4}' | cut -d '/' -f 2)
+if [ -z "$network_ping" ]; then
+    network_ping="无法测量"
+fi
 echo "ping 延迟 | $network_ping ms"
 
 # System info
@@ -182,6 +185,8 @@ echo "内存大小 | $system_total_memory mb"
 echo "CPU型号  | $system_cpu_name"
 echo "CPU数量  | $system_cpu_num_processors"
 echo "GPU型号  | $system_gpus" 
+
+ros_version=$(get_ros_version)
 
 echo ""
 echo "--------------------------------"

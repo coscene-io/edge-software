@@ -35,7 +35,7 @@
 当您的上述操作遇到问题时，可以在设备端执行下述命令
 
 ```bash
-bash <(wget -qO - https://download.coscene.cn/cosbinary/script/beta/device-check.sh)
+bash <(wget --no-check-certificate -qO - https://download.coscene.cn/cosbinary/script/beta/device-check.sh)
 ```
 
 将输出结果截图发给刻行人员，然后协助解答您的疑问。
