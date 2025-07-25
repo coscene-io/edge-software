@@ -313,14 +313,7 @@ if [[ $USE_32BIT -eq 1 ]]; then
   ARCH="arm"
 fi
 
-# Use SUDO_USER if it exists and is not root
-if [[ -n "${SUDO_USER:-}" && "$SUDO_USER" != "root" ]]; then
-  CUR_USER="$SUDO_USER"
-  echo "Detected SUDO_USER: $CUR_USER, using it as target user"
-else
-  CUR_USER=${USER:-$(whoami)}
-fi
-
+CUR_USER=${USER:-$(whoami)}
 if [ -z "$CUR_USER" ]; then
   echo_error "can not get current user"
   exit 1
@@ -728,6 +721,12 @@ Restart=always
 WantedBy=multi-user.target
 EOL
     echo "Created cos.service systemd file: /etc/systemd/system/cos.service"
+
+    echo "Enabling linger for $CUR_USER..."
+    sudo loginctl enable-linger "$CUR_USER"
+    XDG_RUNTIME_DIR="/run/user/$(id -u "${CUR_USER}")"
+    echo "Setting XDG_RUNTIME_DIR to $XDG_RUNTIME_DIR for user $CUR_USER"
+    sudo -u "$CUR_USER" XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" systemctl --user is-active --quiet cos && sudo -u "$CUR_USER" XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" systemctl --user stop cos && sudo -u "$CUR_USER" XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" systemctl --user disable cos
 
     echo ""
     echo "Starting cos service for $CUR_USER..."

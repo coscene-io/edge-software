@@ -24,6 +24,32 @@ on:
     types: [published]
 
   workflow_dispatch:
+    inputs:
+      cos_version:
+        description: 'COS version (leave empty for default: v1.1.7)'
+        required: false
+        default: ''
+        type: string
+      colink_version:
+        description: 'Colink version (leave empty for default: 1.0.4)'
+        required: false
+        default: ''
+        type: string
+      colistener_version:
+        description: 'Colistener version (leave empty for default: 2.1.0-0)'
+        required: false
+        default: ''
+        type: string
+      cobridge_version:
+        description: 'Cobridge version (leave empty for default: 1.1.0-0)'
+        required: false
+        default: ''
+        type: string
+      trzsz_version:
+        description: 'Trzsz version (leave empty for default: 1.1.6)'
+        required: false
+        default: ''
+        type: string
 
 jobs:
   check:
@@ -69,7 +95,43 @@ jobs:
       - name: Build Tar gz file
         run: |
           chmod +x script/package.sh
-          script/package.sh --release_version=${{ env.VERSION }} --output_dir=$GITHUB_WORKSPACE --verbose
+          
+          # Set up version arguments with defaults if inputs are empty
+          COS_VERSION_ARG=""
+          if [ -n "${{ github.event.inputs.cos_version }}" ]; then
+            COS_VERSION_ARG="--cos_version=${{ github.event.inputs.cos_version }}"
+          fi
+          
+          COLINK_VERSION_ARG=""
+          if [ -n "${{ github.event.inputs.colink_version }}" ]; then
+            COLINK_VERSION_ARG="--colink_version=${{ github.event.inputs.colink_version }}"
+          fi
+          
+          COLISTENER_VERSION_ARG=""
+          if [ -n "${{ github.event.inputs.colistener_version }}" ]; then
+            COLISTENER_VERSION_ARG="--colistener_version=${{ github.event.inputs.colistener_version }}"
+          fi
+          
+          COBRIDGE_VERSION_ARG=""
+          if [ -n "${{ github.event.inputs.cobridge_version }}" ]; then
+            COBRIDGE_VERSION_ARG="--cobridge_version=${{ github.event.inputs.cobridge_version }}"
+          fi
+          
+          TRZSZ_VERSION_ARG=""
+          if [ -n "${{ github.event.inputs.trzsz_version }}" ]; then
+            TRZSZ_VERSION_ARG="--trzsz_version=${{ github.event.inputs.trzsz_version }}"
+          fi
+          
+          # Run package script with version arguments
+          script/package.sh \
+            --release_version=${{ env.VERSION }} \
+            --output_dir=$GITHUB_WORKSPACE \
+            --verbose \
+            $COS_VERSION_ARG \
+            $COLINK_VERSION_ARG \
+            $COLISTENER_VERSION_ARG \
+            $COBRIDGE_VERSION_ARG \
+            $TRZSZ_VERSION_ARG
 
       - name: Upload Tar gz beta file
         if: env.IS_RELEASE == 'false'
