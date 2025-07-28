@@ -806,7 +806,7 @@ if [[ $INSTALL_COLISTENER -eq 1 ]]; then
     COLISTENER_DEB_FILE="ros-${ROS_VERSION}-colistener_${UBUNTU_DISTRO}_${ARCH}.deb"
     sudo dpkg -i "$TEMP_DIR/cos_binaries/colistener/${UBUNTU_DISTRO}/${ARCH}/${ROS_VERSION}/${COLISTENER_DEB_FILE}"
   else
-    COLISTENER_VERSION="2.1.0-0"
+    COLISTENER_VERSION="2.2.0-0"
     COLISTENER_DEB_FILE="ros-${ROS_VERSION}-colistener_${COLISTENER_VERSION}${UBUNTU_DISTRO}_${ARCH}.deb"
     COLISTENER_DOWNLOAD_URL="https://apt.coscene.cn/dists/${UBUNTU_DISTRO}/main/binary-${ARCH}/${COLISTENER_DEB_FILE}"
     download_file "$TEMP_DIR"/colistener.deb $COLISTENER_DOWNLOAD_URL $SKIP_VERIFY_CERT
@@ -821,7 +821,7 @@ if [[ $INSTALL_COBRIDGE -eq 1 ]]; then
     COBRIDGE_DEB_FILE="ros-${ROS_VERSION}-cobridge_${UBUNTU_DISTRO}_${ARCH}.deb"
     sudo dpkg -i "$TEMP_DIR/cos_binaries/cobridge/${UBUNTU_DISTRO}/${ARCH}/${ROS_VERSION}/${COBRIDGE_DEB_FILE}"
   else
-    COBRIDGE_VERSION="1.1.0-0"
+    COBRIDGE_VERSION="1.1.2-0"
     COBRIDGE_DEB_FILE="ros-${ROS_VERSION}-cobridge_${COBRIDGE_VERSION}${UBUNTU_DISTRO}_${ARCH}.deb"
     COBRIDGE_DOWNLOAD_URL="https://apt.coscene.cn/dists/${UBUNTU_DISTRO}/main/binary-${ARCH}/${COBRIDGE_DEB_FILE}"
     download_file "$TEMP_DIR"/cobridge.deb $COBRIDGE_DOWNLOAD_URL $SKIP_VERIFY_CERT
