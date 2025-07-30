@@ -113,3 +113,12 @@ release_version: v1.0.0
 ```
 
 其中 --listen_port=12345 参数用于指定代理服务的端口，建议使用大于 10000 以上的端口避免服务冲突。
+
+
+## 卸载
+
+```bash
+/bin/bash -c "$(curl -fsSL https://download.coscene.cn/cosbinary/script/latest/uninstall.sh)"
+```
+
+可以通过上述脚本卸载刻行相关的各类端侧软件以及清除相关的配置信息。

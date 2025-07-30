@@ -29,12 +29,62 @@ else
     VERSION=unknown
 fi
 
+# 统一的ROS版本检测函数
 get_ros_version() {
-    if [ -d /opt/ros ] && [ "$(find /opt/ros -maxdepth 1 -type d | wc -l)" -gt 1 ]; then
+    if [[ -n "${ROS_DISTRO:-}" ]]; then
+        echo "$ROS_DISTRO"
+    elif [ -d /opt/ros ] && [ "$(find /opt/ros -maxdepth 1 -type d | wc -l)" -gt 1 ]; then
         echo $(ls -d /opt/ros/*/ | cut -d'/' -f4)
     else
-        echo "Not found"
+        echo "未安装"
     fi
+}
+
+# 统一的Ubuntu发行版检测函数
+get_ubuntu_distro() {
+    if [[ -f /etc/os-release ]]; then
+        source /etc/os-release
+        echo "$VERSION_CODENAME"
+    elif [[ -f /etc/lsb-release ]]; then
+        source /etc/lsb-release
+        echo "$DISTRIB_CODENAME"
+    else
+        echo "unknown"
+    fi
+}
+
+# 统一的架构信息获取函数
+get_arch_info() {
+    local arch=$(uname -m)
+    local colink_arch=""
+    
+    case "$arch" in
+    x86_64)
+        arch="amd64"
+        colink_arch="amd64"
+        ;;
+    arm64 | aarch64)
+        arch="arm64"
+        colink_arch="aarch64"
+        ;;
+    armv7l)
+        arch="arm"
+        ;;
+    *)
+        arch="unsupported"
+        ;;
+    esac
+    
+    echo "$arch $colink_arch"
+}
+
+# 格式化输出函数，确保对齐
+print_info() {
+    local label="$1"
+    local value="$2"
+    local width=12  # 标签宽度
+    
+    printf "%-${width}s | %s\n" "$label" "$value"
 }
 
 upload_speed_test() {
@@ -87,7 +137,7 @@ download_speed_test() {
 }
 
 speed_test_avg() {
-    local num_tests=3  # 减少测试次数以提高速度
+    local num_tests=2  # 减少测试次数以提高速度
     local total=0
     local valid_tests=0
     
@@ -138,8 +188,102 @@ speed_test_avg() {
     echo "${avg_mbits} Mbit/s"
 }
 
+# 检查网络连通性函数
+check_network_connectivity() {
+    # 方法1: 尝试ping通用DNS服务器
+    if ping -c 1 -W 3 223.5.5.5 >/dev/null 2>&1; then
+        return 0
+    fi
+    
+    # 方法2: 尝试ping目标域名
+    if ping -c 1 -W 3 "${ping_test_endpoint}" >/dev/null 2>&1; then
+        return 0
+    fi
+    
+    # 方法3: 尝试使用curl检查网络
+    if command -v curl &> /dev/null; then
+        if curl -s --max-time 5 --head "http://www.baidu.com" >/dev/null 2>&1; then
+            return 0
+        fi
+    fi
+    
+    return 1
+}
+
+# 添加HTTPS支持检查函数
+check_https_support() {
+    local test_url="https://${ping_test_endpoint}"
+    
+    # 方法1: 使用curl检查HTTPS支持
+    if command -v curl &> /dev/null; then
+        if curl -s --max-time 10 --head "$test_url" >/dev/null 2>&1; then
+            echo "支持"
+            return
+        fi
+    fi
+    
+    # 方法2: 使用wget检查HTTPS支持
+    if command -v wget &> /dev/null; then
+        if wget --timeout=10 --spider --quiet "$test_url" >/dev/null 2>&1; then
+            echo "支持"
+            return
+        fi
+    fi
+    
+    # 方法3: 使用openssl检查SSL/TLS连接
+    if command -v openssl &> /dev/null; then
+        if echo | timeout 10 openssl s_client -connect "${ping_test_endpoint}:443" >/dev/null 2>&1; then
+            echo "支持"
+            return
+        fi
+    fi
+    
+    echo "不支持"
+}
+
+# 检查URL是否可访问的函数
+check_url_availability() {
+    local url="$1"
+    local component_name="$2"
+    
+    # 使用 curl 检查 HTTP 状态码
+    if command -v curl &> /dev/null; then
+        local status_code=$(curl -o /dev/null -s -w "%{http_code}" --max-time 10 --head "$url" 2>/dev/null)
+        if [ "$status_code" = "200" ]; then
+            print_info "$component_name" "可安装"
+            return 0
+        elif [ "$status_code" = "404" ]; then
+            print_info "$component_name" "不可用 (404)"
+            return 1
+        elif [ -n "$status_code" ] && [ "$status_code" != "000" ]; then
+            print_info "$component_name" "异常 (HTTP $status_code)"
+            return 1
+        fi
+    fi
+    
+    # 使用 wget 作为备选方案
+    if command -v wget &> /dev/null; then
+        if wget --timeout=10 --spider --quiet "$url" >/dev/null 2>&1; then
+            print_info "$component_name" "可安装"
+            return 0
+        else
+            print_info "$component_name" "不可用"
+            return 1
+        fi
+    fi
+    
+    print_info "$component_name" "无法检测"
+    return 1
+}
+
 echo "开始进行刻行时空设备客户端安装自检..."
 echo "正在检查中..."
+
+# 全局变量：检查网络连通性
+NETWORK_AVAILABLE=false
+if check_network_connectivity; then
+    NETWORK_AVAILABLE=true
+fi
 
 # 网络检查
 echo ""
@@ -147,50 +291,135 @@ echo "--------------------------------"
 echo "网络检查"
 echo "--------------------------------"
 
-echo "测试下载速度..." && network_download_speed=$(speed_test_avg download)
-echo "下载速度  | $network_download_speed"
+if [ "$NETWORK_AVAILABLE" = true ]; then
+    echo "网络连接正常，开始网络性能测试..."
 
-# echo "Measuring upload speed..." && network_upload_speed=$(speed_test_avg upload)
-echo "测试 ping 延迟..." && network_ping=$(ping -c 4 "${ping_test_endpoint}" 2>/dev/null | tail -1 | awk '{print $4}' | cut -d '/' -f 2)
-if [ -z "$network_ping" ]; then
-    network_ping="无法测量"
+    echo "测试下载速度..." && network_download_speed=$(speed_test_avg download)
+    print_info "下载速度" "$network_download_speed"
+
+    echo "测试 ping 延迟..." && network_ping=$(ping -c 4 "${ping_test_endpoint}" 2>/dev/null | tail -1 | awk '{print $4}' | cut -d '/' -f 2)
+    if [ -z "$network_ping" ]; then
+        network_ping="无法测量"
+    fi
+    print_info "ping 延迟" "$network_ping ms"
+
+    echo "检查HTTPS支持..." && https_support=$(check_https_support)
+    print_info "HTTPS支持" "$https_support"
+else
+    echo "检测到网络不可用，跳过网络性能测试"
+    print_info "网络状态" "无网络连接"
+    print_info "下载速度" "跳过"
+    print_info "ping 延迟" "跳过"
+    print_info "HTTPS支持" "跳过"
 fi
-echo "ping 延迟 | $network_ping ms"
 
-# System info
+# 收集系统信息
 system_os_name=$NAME
 system_os_version=$VERSION
 system_os_kernel=$(uname -r)
 system_arch=$(uname -m)
 system_os_type=$(uname -s)
-system_total_memory=$(awk '/MemTotal/ { printf "%.3f", $2/1024 }' /proc/meminfo 2>/dev/null || echo "Unknown") # mb
+system_total_memory=$(awk '/MemTotal/ { printf "%.3f", $2/1024 }' /proc/meminfo 2>/dev/null || echo "Unknown")
 system_cpu_name=$(lscpu 2>/dev/null | sed -nr '/Model name/ s/.*:\s*(.*) @ .*/\1/p' || echo "Unknown")
 system_cpu_num_processors=$(nproc 2>/dev/null || echo "Unknown")
-
-
-# GPU info
 system_gpus=$(lspci 2>/dev/null | grep -i "VGA" | awk 'BEGIN{FS=": "} {print $2}' || echo "Unknown")
+
+# 获取架构和ROS信息（一次性获取，避免重复）
+arch_info=($(get_arch_info))
+ARCH="${arch_info[0]}"
+COLINK_ARCH="${arch_info[1]}"
+ros_version=$(get_ros_version)
+ubuntu_distro=$(get_ubuntu_distro)
 
 echo ""
 echo "--------------------------------"
 echo "系统信息"
 echo "--------------------------------"
 
-echo "系统类型 | $system_os_type"
-echo "操作系统 | $system_os_name $system_os_version"
-echo "硬件架构 | $system_arch"
-echo "系统内核 | $system_os_kernel"
-
-echo "内存大小 | $system_total_memory mb"
-echo "CPU型号  | $system_cpu_name"
-echo "CPU数量  | $system_cpu_num_processors"
-echo "GPU型号  | $system_gpus" 
-
-ros_version=$(get_ros_version)
+print_info "系统类型" "$system_os_type"
+print_info "操作系统" "$system_os_name $system_os_version"
+print_info "硬件架构" "$system_arch"
+print_info "系统内核" "$system_os_kernel"
+print_info "内存大小" "$system_total_memory MB"
+print_info "CPU型号" "$system_cpu_name"
+print_info "CPU数量" "$system_cpu_num_processors"
+print_info "GPU型号" "$system_gpus"
 
 echo ""
 echo "--------------------------------"
 echo "软件环境"
 echo "--------------------------------"
 
-echo "ROS 版本 | $ros_version"
+print_info "ROS 版本" "$ros_version"
+
+# 从安装脚本同步的配置信息
+ARTIFACT_BASE_URL="https://download.coscene.cn"
+COLINK_VERSION="1.0.4"
+COLISTENER_VERSION="2.2.0-0"
+COBRIDGE_VERSION="1.1.2-0"
+
+# 确定操作系统类型
+OS=$(uname -s)
+case "$OS" in
+Linux)
+  OS="linux"
+  ;;
+*)
+  OS="unsupported"
+  ;;
+esac
+
+
+echo ""
+echo "--------------------------------"
+echo "安装包可用性检查"
+echo "--------------------------------"
+
+# 如果无网络则跳过安装包检查
+if [ "$NETWORK_AVAILABLE" = false ]; then
+    echo "检测到网络不可用，跳过安装包可用性检查"
+    print_info "coScout" "跳过检查"
+    print_info "coLink" "跳过检查"
+    print_info "coListener" "跳过检查"
+    print_info "coBridge" "跳过检查"
+    exit 0
+fi
+
+echo "网络连接正常，开始检查安装包可用性..."
+
+# 检查各个组件的安装包可用性
+if [ "$OS" = "linux" ] && [ "$ARCH" != "unsupported" ]; then
+    # 1. 检查 coScout (cos)
+    LATEST_COS_URL="${ARTIFACT_BASE_URL}/coscout/v2/latest/${OS}-${ARCH}.gz"
+    
+    check_url_availability "$LATEST_COS_URL" "coScout"
+    
+    # 2. 检查 coLink
+    if [ -n "$COLINK_ARCH" ]; then
+        COLINK_DOWNLOAD_URL="${ARTIFACT_BASE_URL}/colink/v${COLINK_VERSION}/colink-${COLINK_ARCH}"
+        check_url_availability "$COLINK_DOWNLOAD_URL" "coLink"
+    else
+        print_info "coLink" "架构不支持"
+    fi
+    
+    # 3. 检查 coListener 和 coBridge (需要ROS环境)
+    if [ "$ros_version" != "unknown" ] && [ "$ros_version" != "未安装" ] && [ "$ubuntu_distro" != "unknown" ]; then
+        # 检查 coListener
+        COLISTENER_DEB_FILE="ros-${ros_version}-colistener_${COLISTENER_VERSION}${ubuntu_distro}_${ARCH}.deb"
+        COLISTENER_DOWNLOAD_URL="https://apt.coscene.cn/dists/${ubuntu_distro}/main/binary-${ARCH}/${COLISTENER_DEB_FILE}"
+        check_url_availability "$COLISTENER_DOWNLOAD_URL" "coListener"
+        
+        # 检查 coBridge
+        COBRIDGE_DEB_FILE="ros-${ros_version}-cobridge_${COBRIDGE_VERSION}${ubuntu_distro}_${ARCH}.deb"
+        COBRIDGE_DOWNLOAD_URL="https://apt.coscene.cn/dists/${ubuntu_distro}/main/binary-${ARCH}/${COBRIDGE_DEB_FILE}"
+        check_url_availability "$COBRIDGE_DOWNLOAD_URL" "coBridge"
+    else
+        print_info "coListener" "需要ROS环境"
+        print_info "coBridge" "需要ROS环境"
+    fi
+else
+    print_info "coScout" "系统不支持"
+    print_info "coLink" "系统不支持"
+    print_info "coListener" "系统不支持"
+    print_info "coBridge" "系统不支持"
+fi
