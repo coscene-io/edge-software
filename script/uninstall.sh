@@ -160,5 +160,41 @@ echo "正在删除 cos 相关文件和目录..."
 [ -d "$CUR_USER_HOME/.local/state/cos" ] && sudo -u "$CUR_USER" rm -rf "$CUR_USER_HOME/.local/state/cos"
 [ -d "$CUR_USER_HOME/.cache/coscene" ] && sudo -u "$CUR_USER" rm -rf "$CUR_USER_HOME/.cache/coscene"
 [ -d "$CUR_USER_HOME/.cache/cos" ] && sudo -u "$CUR_USER" rm -rf "$CUR_USER_HOME/.cache/cos"
+
+get_ros_distro() {
+  if [[ -n "${ROS_DISTRO:-}" ]]; then
+      echo "$ROS_DISTRO"
+  else
+      # Try to find ROS installation in /opt/ros
+      for ros_path in /opt/ros/*; do
+          if [[ -d "$ros_path" ]]; then
+              echo "$(basename "$ros_path")"
+              return 0
+          fi
+      done
+      echo "unknown"
+  fi
+}
+
+ROS_VERSION=$(get_ros_distro)
+
+echo "正在检查 coBridge..."
+if dpkg -l | grep -q "ros-${ROS_VERSION}-cobridge"; then
+    echo "正在卸载 coBridge..."
+    sudo dpkg -r ros-${ROS_VERSION}-cobridge >/dev/null 2>&1 || echo "卸载 coBridge 失败"
+    echo "coBridge 卸载完成"
+else
+    echo "coBridge 未安装，跳过"
+fi
+
+echo "正在检查 coListener..."
+if dpkg -l | grep -q "ros-${ROS_VERSION}-colistener"; then
+    echo "正在卸载 coListener..."
+    sudo dpkg -r ros-${ROS_VERSION}-colistener >/dev/null 2>&1 || echo "卸载 coListener 失败"
+    echo "coListener 卸载完成"
+else
+    echo "coListener 未安装，跳过"
+fi
+
 echo "卸载完成 🎉"
 exit 0
