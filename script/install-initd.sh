@@ -821,12 +821,17 @@ fi
 # Install cobridge and colistener based on flags
 if [[ $INSTALL_COBRIDGE -eq 1 ]] || [[ $INSTALL_COLISTENER -eq 1 ]]; then
   get_ubuntu_distro() {
-    if [[ -f /etc/os-release ]]; then
-      source /etc/os-release
-      echo "$VERSION_CODENAME"
-    elif [[ -f /etc/lsb-release ]]; then
+    # in keenon's ubuntu14.04, /etc/os-release file exists, but `VERSION_CODENAME` and `UBUNTU_CODENAME` not found.
+    # so, check /etc/lsb-release first, if file not exists, fallback to /etc/os-release.
+    if [[ -f /etc/lsb-release ]]; then
       source /etc/lsb-release
-      echo "$DISTRIB_CODENAME"
+      echo "${DISTRIB_CODENAME:-unknown}"
+    elif [[ -f /etc/os-release ]]; then
+      source /etc/os-release
+      if [[ -n "${VERSION_CODENAME:-}" ]]; then
+        echo "$VERSION_CODENAME"
+      elif [[ -n "${UBUNTU_CODENAME:-}" ]]; then
+        echo "$UBUNTU_CODENAME"
     else
       echo "unknown"
     fi
