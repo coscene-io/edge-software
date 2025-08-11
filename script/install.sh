@@ -507,6 +507,7 @@ EOF
     fi
   else
     echo "Skipping systemd service installation, just install coLink binary..."
+    echo "You can manually start coLink with the command: /usr/local/bin/colink daemon --endpoint ${COLINK_ENDPOINT} --network ${COLINK_NETWORK} --allow-ssh"
   fi
   echo_info "Successfully installed coLink."
 fi
@@ -763,6 +764,7 @@ EOL
   fi
 else
   echo "Skipping systemd service installation, just install cos binary..."
+  echo "You can manually start cos with the command: $COS_SHELL_BASE/bin/cos daemon --config-path=${COS_CONFIG_DIR}/config.yaml --log-dir=${COS_LOG_DIR}"
 fi
 
 get_ubuntu_distro() {
