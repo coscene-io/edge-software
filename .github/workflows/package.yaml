@@ -167,6 +167,14 @@ jobs:
             script/uninstall.sh:/cosbinary/script/latest/uninstall.sh
             script/device-check.sh:/cosbinary/script/latest/device-check.sh
 
+      - name: Replace download link in script/install.sh
+        run: |
+          sed -i "s#https://download.coscene.cn#https://coscene-download.s3.us-east-1.amazonaws.com#g" script/install.sh
+          sed -i "s#https://apt.coscene.cn#https://apt.coscene.io#g" script/install.sh
+          sed -i "s#https://download.coscene.cn#https://coscene-download.s3.us-east-1.amazonaws.com#g" script/install-initd.sh
+          sed -i "s#https://apt.coscene.cn#https://apt.coscene.io#g" script/install-initd.sh
+          sed -i "s#https://download.coscene.cn#https://coscene-download.s3.us-east-1.amazonaws.com#g" script/install-proxy.sh
+          
       - name: Upload to S3
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.S3_ARTIFACTS_ACCESS_KEY }}
@@ -180,16 +188,16 @@ jobs:
             aws s3 cp script/install.sh s3://coscene-download/cosbinary/script/latest/install.sh --content-type application/x-sh
             aws s3 cp script/install-proxy.sh s3://coscene-download/cosbinary/script/latest/install-proxy.sh --content-type application/x-sh
             aws s3 cp script/install-initd.sh s3://coscene-download/cosbinary/script/latest/install-initd.sh --content-type application/x-sh
-            aws s3 cp script/uninstall.sh s3://coscene-download/cosbinary/script/latest/uninstall.sh --content-type application/x-sh
-            aws s3 cp script/device-check.sh s3://coscene-download/cosbinary/script/latest/device-check.sh --content-type application/x-sh
+            aws s3 cp script/uninstall-en.sh s3://coscene-download/cosbinary/script/latest/uninstall.sh --content-type application/x-sh
+            aws s3 cp script/device-check-en.sh s3://coscene-download/cosbinary/script/latest/device-check.sh --content-type application/x-sh
           else
             aws s3 cp $GITHUB_WORKSPACE/cos_binaries.tar.gz s3://coscene-download/cosbinary/tar/beta/cos_binaries.tar.gz
 
             aws s3 cp script/install.sh s3://coscene-download/cosbinary/script/beta/install.sh --content-type application/x-sh
             aws s3 cp script/install-proxy.sh s3://coscene-download/cosbinary/script/beta/install-proxy.sh --content-type application/x-sh
             aws s3 cp script/install-initd.sh s3://coscene-download/cosbinary/script/beta/install-initd.sh --content-type application/x-sh
-            aws s3 cp script/uninstall.sh s3://coscene-download/cosbinary/script/beta/uninstall.sh --content-type application/x-sh
-            aws s3 cp script/device-check.sh s3://coscene-download/cosbinary/script/beta/device-check.sh --content-type application/x-sh
+            aws s3 cp script/uninstall-en.sh s3://coscene-download/cosbinary/script/beta/uninstall.sh --content-type application/x-sh
+            aws s3 cp script/device-check-en.sh s3://coscene-download/cosbinary/script/beta/device-check.sh --content-type application/x-sh
           fi
 
       - name: Upload to Release Assets
