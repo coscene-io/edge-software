@@ -17,7 +17,7 @@
 set -e
 
 ping_test_endpoint="openapi.coscene.cn"
-upload_speed_test_endpoint=""
+upload_speed_test_endpoint="https://storage-cn-hangzhou.coscene.cn/v1/speed-test"
 download_speed_test_endpoint="https://coscene-download.oss-cn-hangzhou.aliyuncs.com/cosbinary/tar/latest/cos_binaries.tar.gz"
 
 if [ -f /etc/os-release ]; then
@@ -91,13 +91,33 @@ upload_speed_test() {
     pushd $(mktemp -d) >/dev/null
     local bs
     if [[ "$OSTYPE" == "darwin"* ]]; then
-        bs=2m
+        bs=10m
     else
-        bs=2M
+        bs=10M
     fi
     dd if=/dev/urandom of=speedtest bs=${bs} count=1 2>/dev/null
-    wget --header="Content-type: multipart/form-data" --post-file speedtest ${upload_speed_test_endpoint} -O /dev/null 2>&1 | grep -o "[0-9.]\+ [KM]*B/s"
-    rm speedtest
+    if command -v curl >/dev/null 2>&1; then
+        # 使用 curl 进行上传并直接读取上传速率（bytes/s）
+        local bytes_per_sec
+        bytes_per_sec=$(curl -s -o /dev/null -w "%{speed_upload}" -X POST -F "file=@speedtest" "${upload_speed_test_endpoint}" 2>/dev/null || echo "")
+        if [ -n "$bytes_per_sec" ] && [ "$bytes_per_sec" != "0" ]; then
+            if awk -v s="$bytes_per_sec" 'BEGIN{exit !(s>=1048576)}'; then
+                # >= 1 MiB/s -> 输出 M/s
+                local mps
+                mps=$(awk -v s="$bytes_per_sec" 'BEGIN{printf "%.1f", s/1048576}')
+                echo "${mps}M/s"
+            else
+                # < 1 MiB/s -> 输出 K/s
+                local kps
+                kps=$(awk -v s="$bytes_per_sec" 'BEGIN{printf "%.1f", s/1024}')
+                echo "${kps}K/s"
+            fi
+        fi
+    elif command -v wget >/dev/null 2>&1; then
+        # 作为降级方案尝试使用 wget，但 wget 不易获取上传速率，可能仍然无法解析
+        wget --no-check-certificate --method=POST --body-file=speedtest "${upload_speed_test_endpoint}" -O /dev/null 2>&1 | grep -o "[0-9.]\+ [KM]*B/s"
+    fi
+    rm -f speedtest
     popd >/dev/null
 }
 
@@ -297,6 +317,9 @@ if [ "$NETWORK_AVAILABLE" = true ]; then
     echo "测试下载速度..." && network_download_speed=$(speed_test_avg download)
     print_info "下载速度" "$network_download_speed"
 
+    echo "测试上传速度..." && network_upload_speed=$(speed_test_avg upload)
+    print_info "上传速度" "$network_upload_speed"
+
     echo "测试 ping 延迟..." && network_ping=$(ping -c 4 "${ping_test_endpoint}" 2>/dev/null | tail -1 | awk '{print $4}' | cut -d '/' -f 2)
     if [ -z "$network_ping" ]; then
         network_ping="无法测量"
@@ -309,6 +332,7 @@ else
     echo "检测到网络不可用，跳过网络性能测试"
     print_info "网络状态" "无网络连接"
     print_info "下载速度" "跳过"
+    print_info "上传速度" "跳过"
     print_info "ping 延迟" "跳过"
     print_info "HTTPS支持" "跳过"
 fi

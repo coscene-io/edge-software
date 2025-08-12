@@ -17,7 +17,7 @@
 set -e
 
 ping_test_endpoint="openapi.coscene.io"
-upload_speed_test_endpoint=""
+upload_speed_test_endpoint="https://storage-us-central-1.coscene.io/v1/speed-test"
 download_speed_test_endpoint="https://coscene-download.s3.us-east-1.amazonaws.com/cosbinary/tar/latest/cos_binaries.tar.gz"
 
 if [ -f /etc/os-release ]; then
@@ -91,13 +91,37 @@ upload_speed_test() {
     pushd $(mktemp -d) >/dev/null
     local bs
     if [[ "$OSTYPE" == "darwin"* ]]; then
-        bs=2m
+        bs=10m
     else
-        bs=2M
+        bs=10M
     fi
     dd if=/dev/urandom of=speedtest bs=${bs} count=1 2>/dev/null
-    wget --header="Content-type: multipart/form-data" --post-file speedtest ${upload_speed_test_endpoint} -O /dev/null 2>&1 | grep -o "[0-9.]\+ [KM]*B/s"
-    rm speedtest
+    # If upload speed test endpoint is not configured, return early for upper layer handling
+    if [ -z "${upload_speed_test_endpoint}" ]; then
+        rm -f speedtest
+        popd >/dev/null
+        return 0
+    fi
+    if command -v curl >/dev/null 2>&1; then
+        # Use curl to obtain upload speed (bytes/s)
+        local bytes_per_sec
+        bytes_per_sec=$(curl -s -o /dev/null -w "%{speed_upload}" -X POST -F "file=@speedtest" "${upload_speed_test_endpoint}" 2>/dev/null || echo "")
+        if [ -n "$bytes_per_sec" ] && [ "$bytes_per_sec" != "0" ]; then
+            if awk -v s="$bytes_per_sec" 'BEGIN{exit !(s>=1048576)}'; then
+                local mps
+                mps=$(awk -v s="$bytes_per_sec" 'BEGIN{printf "%.1f", s/1048576}')
+                echo "${mps}M/s"
+            else
+                local kps
+                kps=$(awk -v s="$bytes_per_sec" 'BEGIN{printf "%.1f", s/1024}')
+                echo "${kps}K/s"
+            fi
+        fi
+    elif command -v wget >/dev/null 2>&1; then
+        # Fallback to wget (may not reliably parse speed)
+        wget --method=POST --body-file=speedtest "${upload_speed_test_endpoint}" -O /dev/null 2>&1 | grep -o "[0-9.]\+ [KM]*B/s"
+    fi
+    rm -f speedtest
     popd >/dev/null
 }
 
@@ -297,6 +321,9 @@ if [ "$NETWORK_AVAILABLE" = true ]; then
     echo "Testing download speed..." && network_download_speed=$(speed_test_avg download)
     print_info "Download speed" "$network_download_speed"
 
+    echo "Testing upload speed..." && network_upload_speed=$(speed_test_avg upload)
+    print_info "Upload speed" "$network_upload_speed"
+
     echo "Testing ping latency..." && network_ping=$(ping -c 4 "${ping_test_endpoint}" 2>/dev/null | tail -1 | awk '{print $4}' | cut -d '/' -f 2)
     if [ -z "$network_ping" ]; then
         network_ping="unable to measure"
@@ -309,6 +336,7 @@ else
     echo "Network is not available, skipping network performance test"
     print_info "Network status" "No network connection"
     print_info "Download speed" "Skipped"
+    print_info "Upload speed" "Skipped"
     print_info "Ping latency" "Skipped"
     print_info "HTTPS support" "Skipped"
 fi
