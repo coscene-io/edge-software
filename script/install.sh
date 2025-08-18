@@ -132,6 +132,7 @@ NO_PROXY="localhost,127.0.0.1,::1,.local,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
 COLINK_VERSION=1.0.4
 TRZSZ_VERSION=1.1.6
 ARTIFACT_BASE_URL=https://download.coscene.cn
+APT_BASE_URL=https://apt.coscene.cn
 COLINK_DOWNLOAD_URL=${ARTIFACT_BASE_URL}/colink/v${COLINK_VERSION}/colink-${COLINK_ARCH}
 TRZSZ_DOWNLOAD_URL=${ARTIFACT_BASE_URL}/trzsz/v${TRZSZ_VERSION}/trzsz_${TRZSZ_VERSION}_linux_${COLINK_ARCH}.tar.gz
 
@@ -506,6 +507,7 @@ EOF
     fi
   else
     echo "Skipping systemd service installation, just install coLink binary..."
+    echo "You can manually start coLink with the command: /usr/local/bin/colink daemon --endpoint ${COLINK_ENDPOINT} --network ${COLINK_NETWORK} --allow-ssh"
   fi
   echo_info "Successfully installed coLink."
 fi
@@ -762,6 +764,7 @@ EOL
   fi
 else
   echo "Skipping systemd service installation, just install cos binary..."
+  echo "You can manually start cos with the command: $COS_SHELL_BASE/bin/cos daemon --config-path=${COS_CONFIG_DIR}/config.yaml --log-dir=${COS_LOG_DIR}"
 fi
 
 get_ubuntu_distro() {
@@ -776,6 +779,9 @@ get_ubuntu_distro() {
       echo "$VERSION_CODENAME"
     elif [[ -n "${UBUNTU_CODENAME:-}" ]]; then
       echo "$UBUNTU_CODENAME"
+    else
+      echo "unknown"
+    fi
   else
     echo "unknown"
   fi
@@ -813,7 +819,7 @@ if [[ $INSTALL_COLISTENER -eq 1 ]]; then
   else
     COLISTENER_VERSION="2.2.0-0"
     COLISTENER_DEB_FILE="ros-${ROS_VERSION}-colistener_${COLISTENER_VERSION}${UBUNTU_DISTRO}_${ARCH}.deb"
-    COLISTENER_DOWNLOAD_URL="https://apt.coscene.cn/dists/${UBUNTU_DISTRO}/main/binary-${ARCH}/${COLISTENER_DEB_FILE}"
+    COLISTENER_DOWNLOAD_URL="${APT_BASE_URL}/dists/${UBUNTU_DISTRO}/main/binary-${ARCH}/${COLISTENER_DEB_FILE}"
     download_file "$TEMP_DIR"/colistener.deb $COLISTENER_DOWNLOAD_URL $SKIP_VERIFY_CERT
     sudo dpkg -i "$TEMP_DIR"/colistener.deb
   fi
@@ -828,7 +834,7 @@ if [[ $INSTALL_COBRIDGE -eq 1 ]]; then
   else
     COBRIDGE_VERSION="1.1.2-0"
     COBRIDGE_DEB_FILE="ros-${ROS_VERSION}-cobridge_${COBRIDGE_VERSION}${UBUNTU_DISTRO}_${ARCH}.deb"
-    COBRIDGE_DOWNLOAD_URL="https://apt.coscene.cn/dists/${UBUNTU_DISTRO}/main/binary-${ARCH}/${COBRIDGE_DEB_FILE}"
+    COBRIDGE_DOWNLOAD_URL="${APT_BASE_URL}/dists/${UBUNTU_DISTRO}/main/binary-${ARCH}/${COBRIDGE_DEB_FILE}"
     download_file "$TEMP_DIR"/cobridge.deb $COBRIDGE_DOWNLOAD_URL $SKIP_VERIFY_CERT
     sudo dpkg -i "$TEMP_DIR"/cobridge.deb
   fi

@@ -16,9 +16,9 @@
 
 set -e
 
-ping_test_endpoint="openapi.coscene.cn"
-upload_speed_test_endpoint="https://storage-cn-hangzhou.coscene.cn/v1/speed-test"
-download_speed_test_endpoint="https://coscene-download.oss-cn-hangzhou.aliyuncs.com/cosbinary/tar/latest/cos_binaries.tar.gz"
+ping_test_endpoint="openapi.coscene.io"
+upload_speed_test_endpoint="https://storage-us-central-1.coscene.io/v1/speed-test"
+download_speed_test_endpoint="https://coscene-download.s3.us-east-1.amazonaws.com/cosbinary/tar/latest/cos_binaries.tar.gz"
 
 if [ -f /etc/os-release ]; then
     source /etc/os-release
@@ -29,18 +29,18 @@ else
     VERSION=unknown
 fi
 
-# 统一的ROS版本检测函数
+# Unified ROS version detection function
 get_ros_version() {
     if [[ -n "${ROS_DISTRO:-}" ]]; then
         echo "$ROS_DISTRO"
     elif [ -d /opt/ros ] && [ "$(find /opt/ros -maxdepth 1 -type d | wc -l)" -gt 1 ]; then
         echo $(ls -d /opt/ros/*/ | cut -d'/' -f4)
     else
-        echo "未安装"
+        echo "unknown"
     fi
 }
 
-# 统一的Ubuntu发行版检测函数
+# Unified Ubuntu codename detection function
 get_ubuntu_distro() {
   # in keenon's ubuntu14.04, /etc/os-release file exists, but `VERSION_CODENAME` and `UBUNTU_CODENAME` not found.
   # so, check /etc/lsb-release first, if file not exists, fallback to /etc/os-release.
@@ -61,7 +61,7 @@ get_ubuntu_distro() {
   fi
 }
 
-# 统一的架构信息获取函数
+# Unified architecture info function
 get_arch_info() {
     local arch=$(uname -m)
     local colink_arch=""
@@ -86,11 +86,11 @@ get_arch_info() {
     echo "$arch $colink_arch"
 }
 
-# 格式化输出函数，确保对齐
+# Format output with aligned columns
 print_info() {
     local label="$1"
     local value="$2"
-    local width=12  # 标签宽度
+    local width=12  # label width
     
     printf "%-${width}s | %s\n" "$label" "$value"
 }
@@ -104,68 +104,72 @@ upload_speed_test() {
         bs=10M
     fi
     dd if=/dev/urandom of=speedtest bs=${bs} count=1 2>/dev/null
+    # If upload speed test endpoint is not configured, return early for upper layer handling
+    if [ -z "${upload_speed_test_endpoint}" ]; then
+        rm -f speedtest
+        popd >/dev/null
+        return 0
+    fi
     if command -v curl >/dev/null 2>&1; then
-        # 使用 curl 进行上传并直接读取上传速率（bytes/s）
+        # Use curl to obtain upload speed (bytes/s)
         local bytes_per_sec
         bytes_per_sec=$(curl -s -o /dev/null -w "%{speed_upload}" -X POST -F "file=@speedtest" "${upload_speed_test_endpoint}" 2>/dev/null || echo "")
         if [ -n "$bytes_per_sec" ] && [ "$bytes_per_sec" != "0" ]; then
             if awk -v s="$bytes_per_sec" 'BEGIN{exit !(s>=1048576)}'; then
-                # >= 1 MiB/s -> 输出 M/s
                 local mps
                 mps=$(awk -v s="$bytes_per_sec" 'BEGIN{printf "%.1f", s/1048576}')
                 echo "${mps}M/s"
             else
-                # < 1 MiB/s -> 输出 K/s
                 local kps
                 kps=$(awk -v s="$bytes_per_sec" 'BEGIN{printf "%.1f", s/1024}')
                 echo "${kps}K/s"
             fi
         fi
     elif command -v wget >/dev/null 2>&1; then
-        # 作为降级方案尝试使用 wget，但 wget 不易获取上传速率，可能仍然无法解析
-        wget --no-check-certificate --method=POST --body-file=speedtest "${upload_speed_test_endpoint}" -O /dev/null 2>&1 | grep -o "[0-9.]\+ [KM]*B/s"
+        # Fallback to wget (may not reliably parse speed)
+        wget --method=POST --body-file=speedtest "${upload_speed_test_endpoint}" -O /dev/null 2>&1 | grep -o "[0-9.]\+ [KM]*B/s"
     fi
     rm -f speedtest
     popd >/dev/null
 }
 
 download_speed_test() {
-    # 使用 wget 下载文件并解析速度，支持多种输出格式
+    # Use wget to download and parse speed; support multiple output formats
     local output=$(wget --progress=dot:mega -O /dev/null $download_speed_test_endpoint 2>&1)
     local speed=""
     
-    # 尝试不同的解析方式
-    # 方式1: 匹配 "100.5K/s" 格式
+    # Try multiple parsing patterns
+    # Pattern 1: match "100.5K/s"
     speed=$(echo "$output" | grep -o "[0-9.]\+[KM]/s" | tail -1)
     if [ -n "$speed" ]; then
         echo "$speed"
         return
     fi
     
-    # 方式2: 匹配 "100.5 KB/s" 格式  
+    # Pattern 2: match "100.5 KB/s"
     speed=$(echo "$output" | grep -o "[0-9.]\+ [KM]*B/s" | tail -1)
     if [ -n "$speed" ]; then
         echo "$speed"
         return
     fi
     
-    # 方式3: 使用 curl 作为备选方案
+    # Pattern 3: use curl as fallback
     if command -v curl &> /dev/null; then
         speed=$(curl -o /dev/null -s -w "%{speed_download}" $download_speed_test_endpoint 2>/dev/null)
         if [ -n "$speed" ] && [ "$speed" != "0" ]; then
-            # 转换 bytes/s 到 KB/s
+            # Convert bytes/s to KB/s
             speed_kb=$(echo "$speed" | awk '{printf "%.1f", $1/1024}')
             echo "${speed_kb}K/s"
             return
         fi
     fi
     
-    # 如果都失败了，返回默认值
+    # If all fail, return default
     echo "0K/s"
 }
 
 speed_test_avg() {
-    local num_tests=2  # 减少测试次数以提高速度
+    local num_tests=2  # fewer tests for speed
     local total=0
     local valid_tests=0
     
@@ -178,7 +182,7 @@ speed_test_avg() {
             return 1
         fi
         
-        # 检查是否获取到有效的速度值
+        # Ensure valid speed value
         if [ -z "$speed_test" ] || [[ "$speed_test" == "0"* ]]; then
             continue
         fi
@@ -186,18 +190,18 @@ speed_test_avg() {
         local number=$(echo $speed_test | grep -o "[0-9.]\+" | head -1)
         local units=$(echo $speed_test | grep -o "[KM]*" | head -1)
         
-        # 检查数值是否有效
+        # Validate numeric value
         if [ -z "$number" ] || [ "$number" = "0" ]; then
             continue
         fi
         
-        # 直接转换为 Mbit/s，避免中间转换误差
+        # Convert directly to Mbit/s to avoid rounding drift
         local mbits=0
         if [[ "$units" = "M" ]]; then
-            # MB/s 转 Mbit/s：乘以 8
+            # MB/s to Mbit/s: multiply by 8
             mbits=$(echo $number | awk '{printf "%.2f", $1 * 8}')
         else
-            # KB/s 转 Mbit/s：除以 125 (因为 1000 KB/s ÷ 8 = 125 KB/s = 1 Mbit/s)
+            # KB/s to Mbit/s: divide by 125 (since 1000 KB/s ÷ 8 = 125 KB/s = 1 Mbit/s)
             mbits=$(echo $number | awk '{printf "%.2f", $1 / 125}')
         fi
         
@@ -205,32 +209,32 @@ speed_test_avg() {
         valid_tests=$((valid_tests + 1))
     done
     
-    # 如果没有有效测试，返回默认值
+    # If no valid test results, return default
     if [ $valid_tests -eq 0 ]; then
-        echo "无法测量"
+        echo "unable to measure"
         return
     fi
     
-    # 计算平均值
+    # Compute average
     local avg_mbits=$(echo $total $valid_tests | awk '{printf "%.1f", $1 / $2}')
     echo "${avg_mbits} Mbit/s"
 }
 
-# 检查网络连通性函数
+# Check network connectivity
 check_network_connectivity() {
-    # 方法1: 尝试ping通用DNS服务器
+    # Method 1: ping public DNS
     if ping -c 1 -W 3 223.5.5.5 >/dev/null 2>&1; then
         return 0
     fi
     
-    # 方法2: 尝试ping目标域名
+    # Method 2: ping target domain
     if ping -c 1 -W 3 "${ping_test_endpoint}" >/dev/null 2>&1; then
         return 0
     fi
     
-    # 方法3: 尝试使用curl检查网络
+    # Method 3: use curl to check connectivity
     if command -v curl &> /dev/null; then
-        if curl -s --max-time 5 --head "http://www.baidu.com" >/dev/null 2>&1; then
+        if curl -s --max-time 5 --head "http://www.google.com" >/dev/null 2>&1; then
             return 0
         fi
     fi
@@ -238,114 +242,114 @@ check_network_connectivity() {
     return 1
 }
 
-# 添加HTTPS支持检查函数
+# HTTPS capability check
 check_https_support() {
     local test_url="https://${ping_test_endpoint}"
     
-    # 方法1: 使用curl检查HTTPS支持
+    # Method 1: use curl to check HTTPS
     if command -v curl &> /dev/null; then
         if curl -s --max-time 10 --head "$test_url" >/dev/null 2>&1; then
-            echo "支持"
+            echo "Supported"
             return
         fi
     fi
     
-    # 方法2: 使用wget检查HTTPS支持
+    # Method 2: use wget to check HTTPS
     if command -v wget &> /dev/null; then
         if wget --timeout=10 --spider --quiet "$test_url" >/dev/null 2>&1; then
-            echo "支持"
+            echo "Supported"
             return
         fi
     fi
     
-    # 方法3: 使用openssl检查SSL/TLS连接
+    # Method 3: use openssl to test SSL/TLS
     if command -v openssl &> /dev/null; then
         if echo | timeout 10 openssl s_client -connect "${ping_test_endpoint}:443" >/dev/null 2>&1; then
-            echo "支持"
+            echo "Supported"
             return
         fi
     fi
     
-    echo "不支持"
+    echo "Unsupported"
 }
 
-# 检查URL是否可访问的函数
+# Check if a URL is reachable
 check_url_availability() {
     local url="$1"
     local component_name="$2"
     
-    # 使用 curl 检查 HTTP 状态码
+    # Use curl to get HTTP status code
     if command -v curl &> /dev/null; then
         local status_code=$(curl -o /dev/null -s -w "%{http_code}" --max-time 10 --head "$url" 2>/dev/null)
         if [ "$status_code" = "200" ]; then
-            print_info "$component_name" "可安装"
+            print_info "$component_name" "Installable"
             return 0
         elif [ "$status_code" = "404" ]; then
-            print_info "$component_name" "不可用 (404)"
+            print_info "$component_name" "Unavailable (404)"
             return 1
         elif [ -n "$status_code" ] && [ "$status_code" != "000" ]; then
-            print_info "$component_name" "异常 (HTTP $status_code)"
+            print_info "$component_name" "Exception (HTTP $status_code)"
             return 1
         fi
     fi
     
-    # 使用 wget 作为备选方案
+    # Use wget as a fallback
     if command -v wget &> /dev/null; then
         if wget --timeout=10 --spider --quiet "$url" >/dev/null 2>&1; then
-            print_info "$component_name" "可安装"
+            print_info "$component_name" "Installable"
             return 0
         else
-            print_info "$component_name" "不可用"
+            print_info "$component_name" "Unavailable"
             return 1
         fi
     fi
     
-    print_info "$component_name" "无法检测"
+    print_info "$component_name" "Unable to detect"
     return 1
 }
 
-echo "开始进行刻行时空设备客户端安装自检..."
-echo "正在检查中..."
+echo "Starting device client installation self-check..."
+echo "Checking..."
 
-# 全局变量：检查网络连通性
+# Global flag: network connectivity
 NETWORK_AVAILABLE=false
 if check_network_connectivity; then
     NETWORK_AVAILABLE=true
 fi
 
-# 网络检查
+# Network checks
 echo ""
 echo "--------------------------------"
-echo "网络检查"
+echo "Network checks"
 echo "--------------------------------"
 
 if [ "$NETWORK_AVAILABLE" = true ]; then
-    echo "网络连接正常，开始网络性能测试..."
+    echo "Network connection is normal, starting network performance test..."
 
-    echo "测试下载速度..." && network_download_speed=$(speed_test_avg download)
-    print_info "下载速度" "$network_download_speed"
+    echo "Testing download speed..." && network_download_speed=$(speed_test_avg download)
+    print_info "Download speed" "$network_download_speed"
 
-    echo "测试上传速度..." && network_upload_speed=$(speed_test_avg upload)
-    print_info "上传速度" "$network_upload_speed"
+    echo "Testing upload speed..." && network_upload_speed=$(speed_test_avg upload)
+    print_info "Upload speed" "$network_upload_speed"
 
-    echo "测试 ping 延迟..." && network_ping=$(ping -c 4 "${ping_test_endpoint}" 2>/dev/null | tail -1 | awk '{print $4}' | cut -d '/' -f 2)
+    echo "Testing ping latency..." && network_ping=$(ping -c 4 "${ping_test_endpoint}" 2>/dev/null | tail -1 | awk '{print $4}' | cut -d '/' -f 2)
     if [ -z "$network_ping" ]; then
-        network_ping="无法测量"
+        network_ping="unable to measure"
     fi
-    print_info "ping 延迟" "$network_ping ms"
+    print_info "Ping latency" "$network_ping ms"
 
-    echo "检查HTTPS支持..." && https_support=$(check_https_support)
-    print_info "HTTPS支持" "$https_support"
+    echo "Checking HTTPS support..." && https_support=$(check_https_support)
+    print_info "HTTPS support" "$https_support"
 else
-    echo "检测到网络不可用，跳过网络性能测试"
-    print_info "网络状态" "无网络连接"
-    print_info "下载速度" "跳过"
-    print_info "上传速度" "跳过"
-    print_info "ping 延迟" "跳过"
-    print_info "HTTPS支持" "跳过"
+    echo "Network is not available, skipping network performance test"
+    print_info "Network status" "No network connection"
+    print_info "Download speed" "Skipped"
+    print_info "Upload speed" "Skipped"
+    print_info "Ping latency" "Skipped"
+    print_info "HTTPS support" "Skipped"
 fi
 
-# 收集系统信息
+# Collect system information
 system_os_name=$NAME
 system_os_version=$VERSION
 system_os_kernel=$(uname -r)
@@ -356,7 +360,7 @@ system_cpu_name=$(lscpu 2>/dev/null | sed -nr '/Model name/ s/.*:\s*(.*) @ .*/\1
 system_cpu_num_processors=$(nproc 2>/dev/null || echo "Unknown")
 system_gpus=$(lspci 2>/dev/null | grep -i "VGA" | awk 'BEGIN{FS=": "} {print $2}' || echo "Unknown")
 
-# 获取架构和ROS信息（一次性获取，避免重复）
+# Get architecture and ROS info once to avoid duplication
 arch_info=($(get_arch_info))
 ARCH="${arch_info[0]}"
 COLINK_ARCH="${arch_info[1]}"
@@ -365,32 +369,32 @@ ubuntu_distro=$(get_ubuntu_distro)
 
 echo ""
 echo "--------------------------------"
-echo "系统信息"
+echo "System information"
 echo "--------------------------------"
 
-print_info "系统类型" "$system_os_type"
-print_info "操作系统" "$system_os_name $system_os_version"
-print_info "硬件架构" "$system_arch"
-print_info "系统内核" "$system_os_kernel"
-print_info "内存大小" "$system_total_memory MB"
-print_info "CPU型号" "$system_cpu_name"
-print_info "CPU数量" "$system_cpu_num_processors"
-print_info "GPU型号" "$system_gpus"
+print_info "System type" "$system_os_type"
+print_info "Operating system" "$system_os_name $system_os_version"
+print_info "Hardware architecture" "$system_arch"
+print_info "System kernel" "$system_os_kernel"
+print_info "Memory size" "$system_total_memory MB"
+print_info "CPU model" "$system_cpu_name"
+print_info "CPU number" "$system_cpu_num_processors"
+print_info "GPU model" "$system_gpus"
 
 echo ""
 echo "--------------------------------"
-echo "软件环境"
+echo "Software environment"
 echo "--------------------------------"
 
-print_info "ROS 版本" "$ros_version"
+print_info "ROS version" "$ros_version"
 
-# 从安装脚本同步的配置信息
-ARTIFACT_BASE_URL="https://download.coscene.cn"
+# Artifact configuration synced from installer script
+ARTIFACT_BASE_URL="https://download.coscene.io"
 COLINK_VERSION="1.0.4"
 COLISTENER_VERSION="2.2.0-0"
 COBRIDGE_VERSION="1.1.2-0"
 
-# 确定操作系统类型
+# Determine OS type
 OS=$(uname -s)
 case "$OS" in
 Linux)
@@ -404,54 +408,55 @@ esac
 
 echo ""
 echo "--------------------------------"
-echo "安装包可用性检查"
+echo "Installation package availability check"
 echo "--------------------------------"
 
-# 如果无网络则跳过安装包检查
+# Skip package checks if offline
 if [ "$NETWORK_AVAILABLE" = false ]; then
-    echo "检测到网络不可用，跳过安装包可用性检查"
-    print_info "coScout" "跳过检查"
-    print_info "coLink" "跳过检查"
-    print_info "coListener" "跳过检查"
-    print_info "coBridge" "跳过检查"
+    echo "Network is not available, skipping installation package availability check"
+    print_info "coScout" "Skipped"
+    print_info "coLink" "Skipped"
+    print_info "coListener" "Skipped"
+    print_info "coBridge" "Skipped"
     exit 0
 fi
 
-echo "网络连接正常，开始检查安装包可用性..."
+echo "Network connection is normal, starting installation package availability check..."
 
-# 检查各个组件的安装包可用性
+# Check availability of artifacts for each component
 if [ "$OS" = "linux" ] && [ "$ARCH" != "unsupported" ]; then
-    # 1. 检查 coScout (cos)
+    # 1. Check coScout (cos)
     LATEST_COS_URL="${ARTIFACT_BASE_URL}/coscout/v2/latest/${OS}-${ARCH}.gz"
     
     check_url_availability "$LATEST_COS_URL" "coScout"
     
-    # 2. 检查 coLink
+    # 2. Check coLink
     if [ -n "$COLINK_ARCH" ]; then
         COLINK_DOWNLOAD_URL="${ARTIFACT_BASE_URL}/colink/v${COLINK_VERSION}/colink-${COLINK_ARCH}"
         check_url_availability "$COLINK_DOWNLOAD_URL" "coLink"
     else
-        print_info "coLink" "架构不支持"
+        print_info "coLink" "Unsupported architecture"
     fi
     
-    # 3. 检查 coListener 和 coBridge (需要ROS环境)
-    if [ "$ros_version" != "unknown" ] && [ "$ros_version" != "未安装" ] && [ "$ubuntu_distro" != "unknown" ]; then
-        # 检查 coListener
+    # 3. Check coListener and coBridge (requires ROS environment)
+    if [ "$ros_version" != "unknown" ] && [ "$ros_version" != "unknown" ] && [ "$ubuntu_distro" != "unknown" ]; then
+        # Check coListener
         COLISTENER_DEB_FILE="ros-${ros_version}-colistener_${COLISTENER_VERSION}${ubuntu_distro}_${ARCH}.deb"
-        COLISTENER_DOWNLOAD_URL="https://apt.coscene.cn/dists/${ubuntu_distro}/main/binary-${ARCH}/${COLISTENER_DEB_FILE}"
+        COLISTENER_DOWNLOAD_URL="https://apt.coscene.io/dists/${ubuntu_distro}/main/binary-${ARCH}/${COLISTENER_DEB_FILE}"
         check_url_availability "$COLISTENER_DOWNLOAD_URL" "coListener"
         
-        # 检查 coBridge
+        # Check coBridge
         COBRIDGE_DEB_FILE="ros-${ros_version}-cobridge_${COBRIDGE_VERSION}${ubuntu_distro}_${ARCH}.deb"
-        COBRIDGE_DOWNLOAD_URL="https://apt.coscene.cn/dists/${ubuntu_distro}/main/binary-${ARCH}/${COBRIDGE_DEB_FILE}"
+        COBRIDGE_DOWNLOAD_URL="https://apt.coscene.io/dists/${ubuntu_distro}/main/binary-${ARCH}/${COBRIDGE_DEB_FILE}"
         check_url_availability "$COBRIDGE_DOWNLOAD_URL" "coBridge"
     else
-        print_info "coListener" "需要ROS环境"
-        print_info "coBridge" "需要ROS环境"
+        print_info "coListener" "Requires ROS environment"
+        print_info "coBridge" "Requires ROS environment"
     fi
 else
-    print_info "coScout" "系统不支持"
-    print_info "coLink" "系统不支持"
-    print_info "coListener" "系统不支持"
-    print_info "coBridge" "系统不支持"
+    print_info "coScout" "Unsupported system"
+    print_info "coLink" "Unsupported system"
+    print_info "coListener" "Unsupported system"
+    print_info "coBridge" "Unsupported system"
 fi
+
