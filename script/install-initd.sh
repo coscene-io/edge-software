@@ -833,6 +833,9 @@ if [[ $INSTALL_COBRIDGE -eq 1 ]] || [[ $INSTALL_COLISTENER -eq 1 ]]; then
         echo "$VERSION_CODENAME"
       elif [[ -n "${UBUNTU_CODENAME:-}" ]]; then
         echo "$UBUNTU_CODENAME"
+      else
+        echo "unknown"
+      fi
     else
       echo "unknown"
     fi

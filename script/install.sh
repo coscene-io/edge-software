@@ -779,6 +779,9 @@ get_ubuntu_distro() {
       echo "$VERSION_CODENAME"
     elif [[ -n "${UBUNTU_CODENAME:-}" ]]; then
       echo "$UBUNTU_CODENAME"
+    else
+      echo "unknown"
+    fi
   else
     echo "unknown"
   fi
