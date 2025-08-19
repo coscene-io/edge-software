@@ -99,14 +99,17 @@ esac
 # Set download ARCH based on system architecture
 ARCH=$(uname -m)
 COLINK_ARCH=""
+ROS_NODE_ARCH=""
 case "$ARCH" in
 x86_64)
   ARCH="amd64"
   COLINK_ARCH="amd64"
+  ROS_NODE_ARCH="amd64"
   ;;
 arm64 | aarch64)
   ARCH="arm64"
   COLINK_ARCH="aarch64"
+  ROS_NODE_ARCH="arm64"
   ;;
 armv7l)
   ARCH="arm"
@@ -342,6 +345,7 @@ if [[ $USE_32BIT -eq 1 ]]; then
     exit 1
   fi
   ARCH="arm"
+  ROS_NODE_ARCH="armhf"
 fi
 
 # Use SUDO_USER if it exists and is not root
@@ -868,12 +872,12 @@ COBRIDGE_VERSION="none"
 if [[ $INSTALL_COBRIDGE -eq 1 ]]; then
   echo "Install coListener"
   if [[ -n $USE_LOCAL ]]; then
-    COLISTENER_DEB_FILE="ros-${ROS_VERSION}-colistener_${UBUNTU_DISTRO}_${ARCH}.deb"
-    sudo dpkg -i "$TEMP_DIR/cos_binaries/colistener/${UBUNTU_DISTRO}/${ARCH}/${ROS_VERSION}/${COLISTENER_DEB_FILE}"
+    COLISTENER_DEB_FILE="ros-${ROS_VERSION}-colistener_${UBUNTU_DISTRO}_${ROS_NODE_ARCH}.deb"
+    sudo dpkg -i "$TEMP_DIR/cos_binaries/colistener/${UBUNTU_DISTRO}/${ROS_NODE_ARCH}/${ROS_VERSION}/${COLISTENER_DEB_FILE}"
   else
     COLISTENER_VERSION="2.2.0-0"
-    COLISTENER_DEB_FILE="ros-${ROS_VERSION}-colistener_${COLISTENER_VERSION}${UBUNTU_DISTRO}_${ARCH}.deb"
-    COLISTENER_DOWNLOAD_URL="${APT_BASE_URL}/dists/${UBUNTU_DISTRO}/main/binary-${ARCH}/${COLISTENER_DEB_FILE}"
+    COLISTENER_DEB_FILE="ros-${ROS_VERSION}-colistener_${COLISTENER_VERSION}${UBUNTU_DISTRO}_${ROS_NODE_ARCH}.deb"
+    COLISTENER_DOWNLOAD_URL="${APT_BASE_URL}/dists/${UBUNTU_DISTRO}/main/binary-${ROS_NODE_ARCH}/${COLISTENER_DEB_FILE}"
     download_file "$TEMP_DIR"/colistener.deb $COLISTENER_DOWNLOAD_URL $SKIP_VERIFY_CERT
     sudo dpkg -i "$TEMP_DIR"/colistener.deb
   fi
@@ -882,12 +886,12 @@ fi
 if [[ $INSTALL_COLISTENER -eq 1 ]]; then
   echo "Install coBridge"
   if [[ -n $USE_LOCAL ]]; then
-    COBRIDGE_DEB_FILE="ros-${ROS_VERSION}-cobridge_${UBUNTU_DISTRO}_${ARCH}.deb"
-    sudo dpkg -i "$TEMP_DIR/cos_binaries/cobridge/${UBUNTU_DISTRO}/${ARCH}/${ROS_VERSION}/${COBRIDGE_DEB_FILE}"
+    COBRIDGE_DEB_FILE="ros-${ROS_VERSION}-cobridge_${UBUNTU_DISTRO}_${ROS_NODE_ARCH}.deb"
+    sudo dpkg -i "$TEMP_DIR/cos_binaries/cobridge/${UBUNTU_DISTRO}/${ROS_NODE_ARCH}/${ROS_VERSION}/${COBRIDGE_DEB_FILE}"
   else
     COBRIDGE_VERSION="1.1.2-0"
-    COBRIDGE_DEB_FILE="ros-${ROS_VERSION}-cobridge_${COBRIDGE_VERSION}${UBUNTU_DISTRO}_${ARCH}.deb"
-    COBRIDGE_DOWNLOAD_URL="${APT_BASE_URL}/dists/${UBUNTU_DISTRO}/main/binary-${ARCH}/${COBRIDGE_DEB_FILE}"
+    COBRIDGE_DEB_FILE="ros-${ROS_VERSION}-cobridge_${COBRIDGE_VERSION}${UBUNTU_DISTRO}_${ROS_NODE_ARCH}.deb"
+    COBRIDGE_DOWNLOAD_URL="${APT_BASE_URL}/dists/${UBUNTU_DISTRO}/main/binary-${ROS_NODE_ARCH}/${COBRIDGE_DEB_FILE}"
     download_file "$TEMP_DIR"/cobridge.deb $COBRIDGE_DOWNLOAD_URL $SKIP_VERIFY_CERT
     sudo dpkg -i "$TEMP_DIR"/cobridge.deb
   fi
