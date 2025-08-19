@@ -179,7 +179,7 @@ get_ros_distro() {
 ROS_VERSION=$(get_ros_distro)
 
 echo "Checking coBridge..."
-if dpkg -l | grep -q "ros-${ROS_VERSION}-cobridge"; then
+if dpkg -l | grep "ros-${ROS_VERSION}-cobridge" > /dev/null; then
     echo "Uninstalling coBridge..."
     sudo dpkg -r ros-${ROS_VERSION}-cobridge >/dev/null 2>&1 || echo "Failed to uninstall coBridge"
     echo "coBridge uninstalled"
@@ -188,7 +188,7 @@ else
 fi
 
 echo "Checking coListener..."
-if dpkg -l | grep -q "ros-${ROS_VERSION}-colistener"; then
+if dpkg -l | grep "ros-${ROS_VERSION}-colistener" > /dev/null; then
     echo "Uninstalling coListener..."
     sudo dpkg -r ros-${ROS_VERSION}-colistener >/dev/null 2>&1 || echo "Failed to uninstall coListener"
     echo "coListener uninstalled"

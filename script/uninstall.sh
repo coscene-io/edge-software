@@ -179,7 +179,7 @@ get_ros_distro() {
 ROS_VERSION=$(get_ros_distro)
 
 echo "正在检查 coBridge..."
-if dpkg -l | grep -q "ros-${ROS_VERSION}-cobridge"; then
+if dpkg -l | grep "ros-${ROS_VERSION}-cobridge" > /dev/null; then
     echo "正在卸载 coBridge..."
     sudo dpkg -r ros-${ROS_VERSION}-cobridge >/dev/null 2>&1 || echo "卸载 coBridge 失败"
     echo "coBridge 卸载完成"
@@ -188,7 +188,7 @@ else
 fi
 
 echo "正在检查 coListener..."
-if dpkg -l | grep -q "ros-${ROS_VERSION}-colistener"; then
+if dpkg -l | grep "ros-${ROS_VERSION}-colistener" > /dev/null; then
     echo "正在卸载 coListener..."
     sudo dpkg -r ros-${ROS_VERSION}-colistener >/dev/null 2>&1 || echo "卸载 coListener 失败"
     echo "coListener 卸载完成"
