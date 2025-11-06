@@ -379,29 +379,137 @@ if [[ -z $SN_FILE && -z $SERIAL_NUM ]]; then
   exit 1
 fi
 
+# Smart SN file reading function
+# Supports multiple file formats: plain text, JSON, YAML, and key-value pairs
+# Parameters:
+#   $1: file_path - Path to the SN file
+#   $2: field_name - Field name to extract (optional)
+# Logic:
+#   - If sn_field is provided, must match successfully, otherwise return error
+#   - If sn_field is not provided, treat as plain text
+read_sn_from_file() {
+    local file_path="$1"
+    local field_name="$2"
+    
+    if [[ ! -f "$file_path" ]]; then
+        echo_error "SN file does not exist: $file_path"
+        return 1
+    fi
+    
+    # Try different parsing methods
+    local sn_value=""
+    
+    # Method 1: If field name is specified, try structured format parsing
+    # Must match successfully, otherwise return error
+    if [[ -n "$field_name" ]]; then
+        # Try JSON format
+        if command -v jq &>/dev/null; then
+            sn_value=$(jq -r ".$field_name" "$file_path" 2>/dev/null)
+            if [[ "$sn_value" != "null" ]] && [[ -n "$sn_value" ]] && [[ "$sn_value" != "" ]]; then
+                echo "$sn_value"
+                return 0
+            fi
+        else
+            # Simple JSON parsing (when jq is not available)
+            sn_value=$(grep -o "\"$field_name\": *\"[^\"]*\"" "$file_path" 2>/dev/null | sed "s/\"$field_name\": *\"\([^\"]*\)\"/\1/" | head -1) || sn_value=""
+            if [[ -n "$sn_value" ]]; then
+                echo "$sn_value"
+                return 0
+            fi
+        fi
+        
+        # Try YAML format
+        if command -v yq &>/dev/null; then
+            sn_value=$(yq eval ".$field_name" "$file_path" 2>/dev/null)
+            if [[ "$sn_value" != "null" ]] && [[ -n "$sn_value" ]]; then
+                echo "$sn_value"
+                return 0
+            fi
+        fi
+        
+        # Try simple key-value pair format
+        sn_value=$(grep -o "$field_name: *[^[:space:]]*" "$file_path" 2>/dev/null | sed "s/$field_name: *\(.*\)/\1/" | head -1) || sn_value=""
+        if [[ -n "$sn_value" ]]; then
+            echo "$sn_value"
+            return 0
+        fi
+        
+        # If field_name was provided but not found in any format, return error
+        echo_error "Field '$field_name' not found in file: $file_path"
+        return 1
+    fi
+    
+    # Method 2: If no field name provided, treat as plain text
+    sn_value=$(cat "$file_path" | tr -d '\n\r' | head -1)
+    if [[ -n "$sn_value" ]]; then
+        echo "$sn_value"
+        return 0
+    fi
+    
+    echo_error "Failed to read SN value from file: $file_path"
+    return 1
+}
+
 # check sn_file and sn_field
 # Check if SN_FILE is specified
 if [[ -n $SN_FILE ]]; then
-# Check if SN_FILE has valid extension
-valid_extensions=(.txt .json .yaml .yml)
-extension="${SN_FILE##*.}"
-if [[ ! " ${valid_extensions[*]} " =~ $extension ]]; then
-    echo_error "ERROR: sn file has an invalid extension. Only .txt, .json, .yaml, .yml extensions are allowed. Exiting."
-    exit 1
-fi
-
-# Check if SN_FILE exists
-if [[ ! -f $SN_FILE ]]; then
-    echo_error "ERROR: sn file does not exist. Exiting."
-    exit 1
-fi
-
-# Check if extension is not .txt and SN_FIELD is empty
-echo "extension is $extension"
-if [[ $extension != "txt" && -z $SN_FIELD ]]; then
-    echo_error "ERROR: --sn_field is not specified when sn file exist. Exiting."
-    exit 1
-fi
+    # Check if SN_FILE exists
+    if [[ ! -f $SN_FILE ]]; then
+        echo_error "ERROR: sn file does not exist. Exiting."
+        exit 1
+    fi
+    
+    # Detect file extension
+    extension="${SN_FILE##*.}"
+    
+    # Check extension (if exists)
+    if [[ "$SN_FILE" == *.* ]]; then
+        # File with extension, check if it's in the allowed list
+        valid_extensions=(.txt .json .yaml .yml)
+        if [[ ! " ${valid_extensions[*]} " =~ $extension ]]; then
+            echo_error "ERROR: sn file has an invalid extension. Only .txt, .json, .yaml, .yml extensions are allowed. Exiting."
+            exit 1
+        fi
+        
+        # For non-txt files with extension, sn_field is required
+        if [[ $extension != "txt" && -z $SN_FIELD ]]; then
+            echo_error "ERROR: --sn_field is not specified when sn file has extension other than .txt. Exiting."
+            exit 1
+        fi
+    else
+        # File without extension
+        echo "Detected file without extension: $SN_FILE"
+        if [[ -z $SN_FIELD ]]; then
+            echo "No sn_field provided, will treat as plain text file"
+        else
+            echo "sn_field provided, will try structured formats (yaml/json/yml) first"
+        fi
+    fi
+    
+    # Read SN value
+    echo "Reading SN from file: $SN_FILE"
+    echo "Using field: ${SN_FIELD:-'none (plain text)'}"
+    
+    sn_value=$(read_sn_from_file "$SN_FILE" "$SN_FIELD")
+    if [[ -z "$sn_value" ]]; then
+        echo_error "ERROR: Failed to read SN from file: $SN_FILE"
+        exit 1
+    fi
+    
+    echo "Successfully read SN: $sn_value"
+    
+    # Create internal SN config file (directory will be created later, define path here first)
+    COS_CONFIG_DIR="$CUR_USER_HOME/.config/cos"
+    sudo -u "$CUR_USER" mkdir -p "$COS_CONFIG_DIR"
+    
+    SN_FILE="$COS_CONFIG_DIR/cos_sn.yaml"
+    SN_FIELD="serial_number"
+    
+    sudo -u "$CUR_USER" tee "${SN_FILE}" >/dev/null <<EOL
+"$SN_FIELD": "$sn_value"
+EOL
+    
+    echo "Created internal SN config file: $SN_FILE"
 fi
 
 # check local file path
