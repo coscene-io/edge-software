@@ -35,13 +35,18 @@ echo_info() {
     echo -e "${GREEN}$*${NC}"
 }
 
-# Error handling function
+# Error handling function (will be updated after logging is initialized)
 error_handler() {
     local line_no=$1
     local error_msg=$2
 
-    echo_error "⚠️ Error on line $line_no:"
-    echo_error "⚠️ Error: $error_msg"
+    # Try to log if logging is available, otherwise just echo
+    if command -v log_error &>/dev/null; then
+        log_error "Error on line $line_no: $error_msg"
+    else
+        echo_error "⚠️ Error on line $line_no:"
+        echo_error "⚠️ Error: $error_msg"
+    fi
 
     exit 1
 }
@@ -379,6 +384,289 @@ if [[ -z $SN_FILE && -z $SERIAL_NUM ]]; then
   exit 1
 fi
 
+# Initialize logging
+# Create log directory early (before SN validation)
+COS_LOG_DIR="$CUR_USER_HOME/.local/state/cos/logs"
+# Ensure directory exists with proper permissions
+mkdir -p "$COS_LOG_DIR"
+chown -R "$CUR_USER:$CUR_USER" "$COS_LOG_DIR" 2>/dev/null || true
+INSTALL_LOG="$COS_LOG_DIR/install.log"
+
+# Initialize install log (remove if exists, then create new)
+if [[ -f "$INSTALL_LOG" ]]; then
+    rm -f "$INSTALL_LOG"
+fi
+touch "$INSTALL_LOG"
+chown "$CUR_USER:$CUR_USER" "$INSTALL_LOG" 2>/dev/null || true
+
+# Logging functions
+log_info() {
+    local msg="$1"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    # Ensure log file exists and is writable
+    mkdir -p "$(dirname "$INSTALL_LOG")"
+    echo "[$timestamp] INFO: $msg" >> "$INSTALL_LOG" 2>/dev/null || true
+    echo_info "$msg" >&2  # Output to stderr to avoid being captured by command substitution
+}
+
+log_error() {
+    local msg="$1"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    # Ensure log file exists and is writable
+    mkdir -p "$(dirname "$INSTALL_LOG")"
+    echo "[$timestamp] ERROR: $msg" >> "$INSTALL_LOG" 2>/dev/null || true
+    echo_error "$msg" >&2  # Output to stderr
+}
+
+log_warning() {
+    local msg="$1"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    # Ensure log file exists and is writable
+    mkdir -p "$(dirname "$INSTALL_LOG")"
+    echo "[$timestamp] WARNING: $msg" >> "$INSTALL_LOG" 2>/dev/null || true
+    echo "WARNING: $msg" >&2  # Output to stderr
+}
+
+# Note: install.log is kept after successful installation for debugging
+# It will be cleaned up at the start of the next installation (see line 395-397)
+
+# Error handler is already defined above, it will use log_error if available
+
+log_info "Installation started"
+log_info "Current user: $CUR_USER"
+log_info "User home directory: $CUR_USER_HOME"
+
+# Constants for SN validation
+AGIBOT_SN_PATH="/agibot/data/info/sn"
+AGIBOT_SN_BACKUP_PATH="/agibot/data/info/sn.txt"
+DEFAULT_SN="A200000A900001"
+DEVICE_INFO_API="http://127.0.0.1:22524/device/info"
+
+# Query device SN from API
+# Returns: SN value on success, empty string on failure
+# Always returns exit code 0 to avoid triggering set -e in command substitution
+query_device_sn_from_api() {
+    local api_response=""
+    local sn_value=""
+    local curl_exit_code=0
+    
+    log_info "Querying device info from API: $DEVICE_INFO_API"
+    
+    # Try to query the API (with timeout and error handling)
+    # Use || true to prevent command substitution from failing in set -e mode
+    set +e
+    api_response=$(curl --location --max-time 5 --connect-timeout 2 --silent --show-error "$DEVICE_INFO_API" 2>&1 || echo "CURL_FAILED")
+    curl_exit_code=$?
+    set -e
+    
+    # Check if curl actually failed (not just returned empty response)
+    if [[ "$api_response" == "CURL_FAILED" ]] || [[ $curl_exit_code -ne 0 ]]; then
+        log_warning "Failed to query device info API (API may not be available)"
+        # Return empty string, but exit code 0 to avoid triggering set -e
+        echo ""
+        return 0
+    fi
+    
+    # Check if response is valid JSON with serial_number field
+    if command -v jq &>/dev/null; then
+        set +e
+        sn_value=$(echo "$api_response" | jq -r '.serial_number // empty' 2>/dev/null || echo "")
+        set -e
+        if [[ -n "$sn_value" ]] && [[ "$sn_value" != "null" ]] && [[ "$sn_value" != "" ]]; then
+            log_info "Successfully retrieved SN from API: $sn_value"
+            echo "$sn_value"
+            return 0
+        fi
+    else
+        # Fallback: simple grep extraction
+        set +e
+        sn_value=$(echo "$api_response" | grep -o '"serial_number"[[:space:]]*:[[:space:]]*"[^"]*"' 2>/dev/null | sed 's/.*"serial_number"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' | head -1 || echo "")
+        set -e
+        if [[ -n "$sn_value" ]]; then
+            log_info "Successfully retrieved SN from API: $sn_value"
+            echo "$sn_value"
+            return 0
+        fi
+    fi
+    
+    # Log the actual API response for debugging
+    if [[ -n "$api_response" ]]; then
+        log_warning "API response does not contain valid serial_number field"
+        log_info "API response content: $api_response"
+    else
+        log_warning "API returned empty response"
+    fi
+    # Return empty string, but exit code 0 to avoid triggering set -e
+    echo ""
+    return 0
+}
+
+# Check if SN is default SN
+# Returns: 0 if is default SN, 1 if not
+is_default_sn() {
+    local sn="$1"
+    if [[ "$sn" == "$DEFAULT_SN" ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Read SN from plain text file (for validation purposes)
+read_sn_from_plain_text() {
+    local file_path="$1"
+    
+    if [[ ! -f "$file_path" ]]; then
+        log_error "SN file does not exist: $file_path"
+        return 1
+    fi
+    
+    # Read as plain text (first line, trim whitespace)
+    local sn_value=$(cat "$file_path" | head -1 | tr -d '\n\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    
+    if [[ -z "$sn_value" ]]; then
+        log_error "Failed to read SN from file (file is empty or contains only whitespace): $file_path"
+        return 1
+    fi
+    
+    echo "$sn_value"
+    return 0
+}
+
+# Uninstall coScene (call uninstall script)
+uninstall_coscene() {
+    log_info "Uninstalling coScene before re-registration..."
+    
+    # Find uninstall script (try script/uninstall.sh first, then script/uninstall-en.sh)
+    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+    local uninstall_script=""
+    
+    if [[ -f "$script_dir/uninstall.sh" ]]; then
+        uninstall_script="$script_dir/uninstall.sh"
+    elif [[ -f "$script_dir/uninstall-en.sh" ]]; then
+        uninstall_script="$script_dir/uninstall-en.sh"
+    else
+        log_error "Uninstall script not found in $script_dir"
+        return 1
+    fi
+    
+    log_info "Executing uninstall script: $uninstall_script"
+    bash "$uninstall_script" || {
+        log_warning "Uninstall script returned non-zero exit code, continuing..."
+    }
+    
+    log_info "Uninstall completed"
+    return 0
+}
+
+# Validate and prepare SN (main validation logic)
+# This function is called when --sn_file is /agibot/data/info/sn
+validate_and_prepare_sn() {
+    log_info "Starting SN validation for agibot installation"
+    
+    local original_sn=""
+    local api_sn=""
+    local backup_sn=""
+    local need_uninstall=false
+    
+    # Step 1: Try to query API
+    # Function always returns 0, check output to determine success
+    api_sn=$(query_device_sn_from_api)
+    
+    if [[ -n "$api_sn" ]]; then
+        # Case 1: API call successful
+        log_info "API call successful, retrieved SN: $api_sn"
+        
+        # Read original SN file
+        original_sn=$(read_sn_from_plain_text "$AGIBOT_SN_PATH") || {
+            log_error "Failed to read original SN file: $AGIBOT_SN_PATH"
+            exit 1
+        }
+        log_info "Original SN from file: $original_sn"
+        
+        # Check for default SN
+        if is_default_sn "$original_sn"; then
+            log_error "Original SN file contains default SN ($DEFAULT_SN). Installation aborted."
+            exit 1
+        fi
+        
+        if is_default_sn "$api_sn"; then
+            log_error "API returned default SN ($DEFAULT_SN). Installation aborted."
+            exit 1
+        fi
+        
+        # Compare API SN and original SN
+        if [[ "$api_sn" != "$original_sn" ]]; then
+            log_warning "SN mismatch detected: API SN ($api_sn) != Original SN ($original_sn)"
+            log_info "SN has changed, will uninstall and re-register"
+            need_uninstall=true
+        else
+            log_info "SN matches between API and original file, proceeding with normal installation"
+        fi
+    else
+        # Case 2: API call failed
+        log_info "API call failed or not available, using backup file comparison"
+        
+        # Read original SN file
+        original_sn=$(read_sn_from_plain_text "$AGIBOT_SN_PATH") || {
+            log_error "Failed to read original SN file: $AGIBOT_SN_PATH"
+            exit 1
+        }
+        log_info "Original SN from file: $original_sn"
+        
+        # Check for default SN first (before any other processing)
+        if is_default_sn "$original_sn"; then
+            log_error "Original SN file contains default SN ($DEFAULT_SN). Installation aborted."
+            exit 1
+        fi
+        
+        # Check if backup file exists
+        if [[ ! -f "$AGIBOT_SN_BACKUP_PATH" ]]; then
+            log_info "Backup SN file does not exist, treating as new machine"
+            log_info "Will uninstall and re-register"
+            need_uninstall=true
+        else
+            # Read backup SN file
+            backup_sn=$(read_sn_from_plain_text "$AGIBOT_SN_BACKUP_PATH") || {
+                log_warning "Failed to read backup SN file, treating as new machine"
+                need_uninstall=true
+            }
+            
+            if [[ -n "$backup_sn" ]]; then
+                log_info "Backup SN from file: $backup_sn"
+                
+                # Compare original SN and backup SN
+                if [[ "$original_sn" != "$backup_sn" ]]; then
+                    log_warning "SN mismatch detected: Original SN ($original_sn) != Backup SN ($backup_sn)"
+                    log_info "SN has changed, will uninstall and re-register"
+                    need_uninstall=true
+                else
+                    log_info "SN matches between original and backup files, proceeding with normal upgrade"
+                fi
+            fi
+        fi
+    fi
+    
+    # Execute uninstall if needed
+    if [[ "$need_uninstall" == "true" ]]; then
+        uninstall_coscene || {
+            log_error "Failed to uninstall coScene"
+            exit 1
+        }
+        log_info "Uninstall completed, will proceed with fresh installation"
+    fi
+    
+    log_info "SN validation completed successfully"
+}
+
+# Check if SN_FILE is /agibot/data/info/sn and trigger validation
+if [[ -n "$SN_FILE" ]] && [[ "$SN_FILE" == "/agibot/data/info/sn" ]]; then
+    log_info "Detected agibot SN file path, triggering validation logic"
+    validate_and_prepare_sn
+else
+    log_info "SN file path is not /agibot/data/info/sn, skipping validation (using existing logic)"
+fi
+
 # Smart SN file reading function
 # Supports multiple file formats: plain text, JSON, YAML, and key-value pairs
 # Parameters:
@@ -404,14 +692,18 @@ read_sn_from_file() {
     if [[ -n "$field_name" ]]; then
         # Try JSON format
         if command -v jq &>/dev/null; then
-            sn_value=$(jq -r ".$field_name" "$file_path" 2>/dev/null)
+            set +e
+            sn_value=$(jq -r ".$field_name" "$file_path" 2>/dev/null || echo "")
+            set -e
             if [[ "$sn_value" != "null" ]] && [[ -n "$sn_value" ]] && [[ "$sn_value" != "" ]]; then
                 echo "$sn_value"
                 return 0
             fi
         else
             # Simple JSON parsing (when jq is not available)
-            sn_value=$(grep -o "\"$field_name\": *\"[^\"]*\"" "$file_path" 2>/dev/null | sed "s/\"$field_name\": *\"\([^\"]*\)\"/\1/" | head -1) || sn_value=""
+            set +e
+            sn_value=$(grep -o "\"$field_name\": *\"[^\"]*\"" "$file_path" 2>/dev/null | sed "s/\"$field_name\": *\"\([^\"]*\)\"/\1/" | head -1 || echo "")
+            set -e
             if [[ -n "$sn_value" ]]; then
                 echo "$sn_value"
                 return 0
@@ -420,7 +712,9 @@ read_sn_from_file() {
         
         # Try YAML format
         if command -v yq &>/dev/null; then
-            sn_value=$(yq eval ".$field_name" "$file_path" 2>/dev/null)
+            set +e
+            sn_value=$(yq eval ".$field_name" "$file_path" 2>/dev/null || echo "")
+            set -e
             if [[ "$sn_value" != "null" ]] && [[ -n "$sn_value" ]]; then
                 echo "$sn_value"
                 return 0
@@ -428,7 +722,9 @@ read_sn_from_file() {
         fi
         
         # Try simple key-value pair format
-        sn_value=$(grep -o "$field_name: *[^[:space:]]*" "$file_path" 2>/dev/null | sed "s/$field_name: *\(.*\)/\1/" | head -1) || sn_value=""
+        set +e
+        sn_value=$(grep -o "$field_name: *[^[:space:]]*" "$file_path" 2>/dev/null | sed "s/$field_name: *\(.*\)/\1/" | head -1 || echo "")
+        set -e
         if [[ -n "$sn_value" ]]; then
             echo "$sn_value"
             return 0
@@ -497,6 +793,9 @@ if [[ -n $SN_FILE ]]; then
     fi
     
     echo "Successfully read SN: $sn_value"
+    
+    # Save SN value for later use (in case REMOVE_CONFIG deletes the file)
+    SERIAL_NUM="$sn_value"
     
     # Create internal SN config file (directory will be created later, define path here first)
     COS_CONFIG_DIR="$CUR_USER_HOME/.config/cos"
@@ -967,4 +1266,6 @@ assemblies:
 EOF
 
 echo_info "Successfully installed cos."
+log_info "Installation completed successfully"
+# Keep install log for debugging (will be cleaned up at the start of next installation)
 exit 0
