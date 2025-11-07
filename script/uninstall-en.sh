@@ -123,6 +123,26 @@ else
     echo "No system-level cos service found, skipping system-level service uninstallation..."
 fi
 
+# Uninstall system-level cos-slave service
+echo "Checking and uninstalling system-level cos-slave service..."
+if [[ "$(ps --no-headers -o comm 1 2>&1)" == "systemd" ]] && command -v systemctl 2>&1; then
+    if systemctl is-active --quiet cos-slave 2>/dev/null; then
+        echo "Found running system-level cos-slave systemd service, stopping..."
+        sudo systemctl stop cos-slave || echo "Failed to stop system-level cos-slave service, continuing..."
+    fi
+    if systemctl is-enabled --quiet cos-slave 2>/dev/null; then
+        echo "Disabling system-level cos-slave systemd service..."
+        sudo systemctl disable cos-slave || echo "Failed to disable system-level cos-slave service, continuing..."
+    fi
+    if [ -f "/etc/systemd/system/cos-slave.service" ]; then
+        echo "Removing system-level cos-slave service file..."
+        sudo rm -f /etc/systemd/system/cos-slave.service
+        sudo systemctl daemon-reload
+    fi
+else
+    echo "No system-level cos-slave service found, skipping system-level service uninstallation..."
+fi
+
 # Uninstall user-level cos service (maintain backward compatibility)
 echo "Checking and uninstalling user-level cos service..."
 if [[ "$(ps --no-headers -o comm 1 2>&1)" == "systemd" ]] && command -v systemctl 2>&1; then

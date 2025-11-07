@@ -123,6 +123,26 @@ else
     echo "未发现系统级 cos 服务，跳过系统级服务卸载..."
 fi
 
+# 卸载系统级的 cos-slave 服务
+echo "检查并卸载系统级 cos-slave 服务..."
+if [[ "$(ps --no-headers -o comm 1 2>&1)" == "systemd" ]] && command -v systemctl 2>&1; then
+    if systemctl is-active --quiet cos-slave 2>/dev/null; then
+        echo "发现运行中的系统级 cos-slave systemd 服务，正在停止..."
+        sudo systemctl stop cos-slave || echo "停止系统级 cos-slave 服务失败，继续执行..."
+    fi
+    if systemctl is-enabled --quiet cos-slave 2>/dev/null; then
+        echo "正在禁用系统级 cos-slave systemd 服务..."
+        sudo systemctl disable cos-slave || echo "禁用系统级 cos-slave 服务失败，继续执行..."
+    fi
+    if [ -f "/etc/systemd/system/cos-slave.service" ]; then
+        echo "正在删除系统级 cos-slave 服务文件..."
+        sudo rm -f /etc/systemd/system/cos-slave.service
+        sudo systemctl daemon-reload
+    fi
+else
+    echo "未发现系统级 cos-slave 服务，跳过系统级服务卸载..."
+fi
+
 # 卸载用户态的 cos 服务（保持历史兼容性）
 echo "检查并卸载用户级 cos 服务..."
 if [[ "$(ps --no-headers -o comm 1 2>&1)" == "systemd" ]] && command -v systemctl 2>&1; then
