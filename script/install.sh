@@ -568,6 +568,7 @@ validate_and_prepare_sn() {
     local api_sn=""
     local backup_sn=""
     local need_uninstall=false
+    local should_exit=false
     
     # Step 1: Try to query API
     # Function always returns 0, check output to determine success
@@ -584,19 +585,22 @@ validate_and_prepare_sn() {
         }
         log_info "Original SN from file: $original_sn"
         
-        # Check for default SN
-        if is_default_sn "$original_sn"; then
-            log_error "Original SN file contains default SN ($DEFAULT_SN). Installation aborted."
-            exit 1
-        fi
-        
-        if is_default_sn "$api_sn"; then
-            log_error "API returned default SN ($DEFAULT_SN). Installation aborted."
-            exit 1
-        fi
-        
+        # Check if both are default SN (Requirement 3)
+        if is_default_sn "$original_sn" && is_default_sn "$api_sn"; then
+            log_error "Both original SN file and API returned default SN ($DEFAULT_SN). Will uninstall and exit."
+            need_uninstall=true
+            should_exit=true
+        # Check if original SN is default SN (but API is not)
+        elif is_default_sn "$original_sn"; then
+            log_error "Original SN file contains default SN ($DEFAULT_SN). Will uninstall and exit."
+            need_uninstall=true
+            should_exit=true
+        # Check if API SN is default SN (but original is not) - Requirement 1
+        elif is_default_sn "$api_sn"; then
+            log_warning "API returned default SN ($DEFAULT_SN) but original SN is not default. Will uninstall and re-register."
+            need_uninstall=true
         # Compare API SN and original SN
-        if [[ "$api_sn" != "$original_sn" ]]; then
+        elif [[ "$api_sn" != "$original_sn" ]]; then
             log_warning "SN mismatch detected: API SN ($api_sn) != Original SN ($original_sn)"
             log_info "SN has changed, will uninstall and re-register"
             need_uninstall=true
@@ -614,14 +618,13 @@ validate_and_prepare_sn() {
         }
         log_info "Original SN from file: $original_sn"
         
-        # Check for default SN first (before any other processing)
+        # Check if original SN is default SN (Requirement 2)
         if is_default_sn "$original_sn"; then
-            log_error "Original SN file contains default SN ($DEFAULT_SN). Installation aborted."
-            exit 1
-        fi
-        
+            log_error "Original SN file contains default SN ($DEFAULT_SN). Will uninstall and exit."
+            need_uninstall=true
+            should_exit=true
         # Check if backup file exists
-        if [[ ! -f "$AGIBOT_SN_BACKUP_PATH" ]]; then
+        elif [[ ! -f "$AGIBOT_SN_BACKUP_PATH" ]]; then
             log_info "Backup SN file does not exist, treating as new machine"
             log_info "Will uninstall and re-register"
             need_uninstall=true
@@ -635,8 +638,12 @@ validate_and_prepare_sn() {
             if [[ -n "$backup_sn" ]]; then
                 log_info "Backup SN from file: $backup_sn"
                 
+                # Check if backup SN is default SN (Requirement 4)
+                if is_default_sn "$backup_sn"; then
+                    log_warning "Backup SN file contains default SN ($DEFAULT_SN) but original SN is not default. Will uninstall and re-register."
+                    need_uninstall=true
                 # Compare original SN and backup SN
-                if [[ "$original_sn" != "$backup_sn" ]]; then
+                elif [[ "$original_sn" != "$backup_sn" ]]; then
                     log_warning "SN mismatch detected: Original SN ($original_sn) != Backup SN ($backup_sn)"
                     log_info "SN has changed, will uninstall and re-register"
                     need_uninstall=true
@@ -653,7 +660,15 @@ validate_and_prepare_sn() {
             log_error "Failed to uninstall coScene"
             exit 1
         }
-        log_info "Uninstall completed, will proceed with fresh installation"
+        log_info "Uninstall completed"
+        
+        # Exit if should_exit flag is set (Requirements 2 and 3)
+        if [[ "$should_exit" == "true" ]]; then
+            log_error "Installation aborted due to default SN detected."
+            exit 1
+        else
+            log_info "Will proceed with fresh installation"
+        fi
     fi
     
     log_info "SN validation completed successfully"
