@@ -133,7 +133,7 @@ ENABLE_MASTER=0
 HTTP_PROXY=""
 NO_PROXY="localhost,127.0.0.1,::1,.local,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
 
-COLINK_VERSION=1.0.4
+COLINK_VERSION=1.0.5
 TRZSZ_VERSION=1.1.6
 ARTIFACT_BASE_URL=https://download.coscene.cn
 APT_BASE_URL=https://apt.coscene.cn
