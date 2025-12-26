@@ -134,10 +134,11 @@ SKIP_VERIFY_CERT=0
 COLINK_ENDPOINT=""
 INSTALL_COLISTENER=0
 INSTALL_COBRIDGE=0
+ENABLE_MASTER=0
 HTTP_PROXY=""
 NO_PROXY="localhost,127.0.0.1,::1,.local,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
 
-COLINK_VERSION=1.0.4
+COLINK_VERSION=1.0.5
 TRZSZ_VERSION=1.1.6
 ARTIFACT_BASE_URL=https://download.coscene.cn
 APT_BASE_URL=https://apt.coscene.cn
@@ -166,6 +167,7 @@ usage: $0 [OPTIONS]
     --skip_verify_cert      Skip verify certificate when download files
     --install_colistener    Install colistener component (default: false)
     --install_cobridge      Install cobridge component (default: false)
+    --enable_master         Enable master mode for master-slave architecture (default: false)
     --http_proxy            Set HTTP proxy for cos service (e.g. http://proxy.example.com:8080)
     --version               Show the version of the cos
 EOF
@@ -292,6 +294,10 @@ while test $# -gt 0; do
     ;;
   --install_cobridge)
     INSTALL_COBRIDGE=1
+    shift # past argument
+    ;;
+  --enable_master)
+    ENABLE_MASTER=1
     shift # past argument
     ;;
   --http_proxy=*)
@@ -991,6 +997,11 @@ if [[ $SKIP_VERIFY_CERT -eq 1 ]]; then
   INSECURE=true
 fi
 
+MASTER_ENABLED=false
+if [[ $ENABLE_MASTER -eq 1 ]]; then
+  MASTER_ENABLED=true
+fi
+
 # create config file ~/.config/cos/config.yaml
 sudo -u "$CUR_USER" tee "${COS_CONFIG_DIR}/config.yaml" >/dev/null <<EOL
 api:
@@ -1009,6 +1020,9 @@ mod:
   name: $MOD
   conf:
     enabled: true
+
+master_slave:
+  enabled: $MASTER_ENABLED
 
 __import__:
   - $DEFAULT_IMPORT_CONFIG
@@ -1166,10 +1180,10 @@ EOL
 
     echo "Checking if cos service is running..."
     sudo systemctl is-active --quiet cos && sudo systemctl stop cos && sudo systemctl disable cos
-    
+
     echo "Enabling cos service..."
     sudo systemctl enable cos
-    
+
     echo "Starting cos service..."
     if sudo systemctl start cos; then
       echo "Cos service started successfully."
@@ -1181,7 +1195,7 @@ EOL
       echo_error "Checking journal logs for more details..."
       sudo journalctl -xe -u cos --no-pager | tail -n 50
     fi
-    
+
     echo ""
     echo_info "🎉 Installation completed successfully , you can use 'tail -f ${COS_LOG_DIR}/cos.log' to check the logs."
   else

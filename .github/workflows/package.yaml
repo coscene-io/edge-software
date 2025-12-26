@@ -146,6 +146,7 @@ jobs:
             /home/runner/work/edge-software/edge-software/cos_binaries.tar.gz:/cosbinary/tar/${{ env.VERSION }}/cos_binaries.tar.gz
             script/install.sh:/cosbinary/script/beta/install.sh
             script/install-proxy.sh:/cosbinary/script/beta/install-proxy.sh
+            script/install-slave.sh:/cosbinary/script/beta/install-slave.sh
             script/install-initd.sh:/cosbinary/script/beta/install-initd.sh
             script/uninstall.sh:/cosbinary/script/beta/uninstall.sh
             script/device-check.sh:/cosbinary/script/beta/device-check.sh
@@ -163,6 +164,7 @@ jobs:
             /home/runner/work/edge-software/edge-software/cos_binaries.tar.gz:/cosbinary/tar/${{ env.VERSION }}/cos_binaries.tar.gz
             script/install.sh:/cosbinary/script/latest/install.sh
             script/install-proxy.sh:/cosbinary/script/latest/install-proxy.sh
+            script/install-slave.sh:/cosbinary/script/latest/install-slave.sh
             script/install-initd.sh:/cosbinary/script/latest/install-initd.sh
             script/uninstall.sh:/cosbinary/script/latest/uninstall.sh
             script/device-check.sh:/cosbinary/script/latest/device-check.sh
@@ -174,6 +176,8 @@ jobs:
           sed -i "s#https://download.coscene.cn#https://coscene-download.s3.us-east-1.amazonaws.com#g" script/install-initd.sh
           sed -i "s#https://apt.coscene.cn#https://apt.coscene.io#g" script/install-initd.sh
           sed -i "s#https://download.coscene.cn#https://coscene-download.s3.us-east-1.amazonaws.com#g" script/install-proxy.sh
+          sed -i "s#https://apt.coscene.cn#https://apt.coscene.io#g" script/install-slave.sh
+          sed -i "s#https://download.coscene.cn#https://coscene-download.s3.us-east-1.amazonaws.com#g" script/install-slave.sh
           
       - name: Upload to S3
         env:
@@ -186,6 +190,7 @@ jobs:
             aws s3 cp $GITHUB_WORKSPACE/cos_binaries.tar.gz s3://coscene-download/cosbinary/tar/latest/cos_binaries.tar.gz
 
             aws s3 cp script/install.sh s3://coscene-download/cosbinary/script/latest/install.sh --content-type application/x-sh
+            aws s3 cp script/install-slave.sh s3://coscene-download/cosbinary/script/latest/install-slave.sh --content-type application/x-sh
             aws s3 cp script/install-proxy.sh s3://coscene-download/cosbinary/script/latest/install-proxy.sh --content-type application/x-sh
             aws s3 cp script/install-initd.sh s3://coscene-download/cosbinary/script/latest/install-initd.sh --content-type application/x-sh
             aws s3 cp script/uninstall-en.sh s3://coscene-download/cosbinary/script/latest/uninstall.sh --content-type application/x-sh
@@ -194,6 +199,7 @@ jobs:
             aws s3 cp $GITHUB_WORKSPACE/cos_binaries.tar.gz s3://coscene-download/cosbinary/tar/beta/cos_binaries.tar.gz
 
             aws s3 cp script/install.sh s3://coscene-download/cosbinary/script/beta/install.sh --content-type application/x-sh
+            aws s3 cp script/install-slave.sh s3://coscene-download/cosbinary/script/beta/install-slave.sh --content-type application/x-sh
             aws s3 cp script/install-proxy.sh s3://coscene-download/cosbinary/script/beta/install-proxy.sh --content-type application/x-sh
             aws s3 cp script/install-initd.sh s3://coscene-download/cosbinary/script/beta/install-initd.sh --content-type application/x-sh
             aws s3 cp script/uninstall-en.sh s3://coscene-download/cosbinary/script/beta/uninstall.sh --content-type application/x-sh
