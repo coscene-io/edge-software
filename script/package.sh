@@ -156,17 +156,26 @@ SUPPORT_COS_ARCH=("amd64" "arm64" "arm")
 SUPPORT_MESH_ARCH=("amd64" "aarch64")
 
 SUPPORT_COLISTENER_ARCH=("amd64" "arm64" "armhf")
-declare -A SUPPORT_ROS_DISTRO_MAP
-SUPPORT_ROS_DISTRO_MAP["noetic"]="focal"
-SUPPORT_ROS_DISTRO_MAP["foxy"]="focal"
-SUPPORT_ROS_DISTRO_MAP["humble"]="jammy"
-SUPPORT_ROS_DISTRO_MAP["melodic"]="bionic"
-SUPPORT_ROS_DISTRO_MAP["jazzy"]="noble"
-# SUPPORT_ROS_DISTRO_MAP["indigo"]="trusty"
+SUPPORT_COBRIDGE_ARCH=("amd64" "arm64" "armhf")
+
+declare -A COLISTENER_SUPPORT_ROS_DISTRO_MAP
+COLISTENER_SUPPORT_ROS_DISTRO_MAP["noetic"]="focal"
+COLISTENER_SUPPORT_ROS_DISTRO_MAP["foxy"]="focal"
+COLISTENER_SUPPORT_ROS_DISTRO_MAP["humble"]="jammy"
+COLISTENER_SUPPORT_ROS_DISTRO_MAP["melodic"]="bionic"
+COLISTENER_SUPPORT_ROS_DISTRO_MAP["jazzy"]="noble"
+
+declare -A COBRIDGE_SUPPORT_ROS_DISTRO_MAP
+COBRIDGE_SUPPORT_ROS_DISTRO_MAP["melodic"]="bionic"
+COBRIDGE_SUPPORT_ROS_DISTRO_MAP["noetic"]="focal"
+COBRIDGE_SUPPORT_ROS_DISTRO_MAP["foxy"]="focal"
+COBRIDGE_SUPPORT_ROS_DISTRO_MAP["humble"]="jammy"
+COBRIDGE_SUPPORT_ROS_DISTRO_MAP["jazzy"]="noble"
+
 
 MESH_BASE_URL=https://coscene-download.oss-cn-hangzhou.aliyuncs.com
 COS_BASE_URL=https://coscene-download.oss-cn-hangzhou.aliyuncs.com/coscout/v2
-COLISTENER_BASE_URL=https://coscene-apt.oss-cn-hangzhou.aliyuncs.com/dists
+COLISTENER_BASE_URL=https://apt.coscene.cn/dists
 
 # get user input
 while test $# -gt 0; do
@@ -254,8 +263,8 @@ total_downloads=0
 total_downloads=$((total_downloads + ${#SUPPORT_MESH_ARCH[@]} * 2))  # mesh + trzsz
 total_downloads=$((total_downloads + ${#SUPPORT_OS[@]} * ${#SUPPORT_COS_ARCH[@]} * 2))  # cos + metadata
 total_downloads=$((total_downloads + 3 * ${#SUPPORT_OS[@]}))  # cgroup files for arm
-total_downloads=$((total_downloads + ${#SUPPORT_COLISTENER_ARCH[@]} * ${#SUPPORT_ROS_DISTRO_MAP[@]}))  # colistener
-total_downloads=$((total_downloads + ${#SUPPORT_COLISTENER_ARCH[@]} * ${#SUPPORT_ROS_DISTRO_MAP[@]}))  # cobridge
+total_downloads=$((total_downloads + (${#SUPPORT_COLISTENER_ARCH[@]} - 1) * ${#COLISTENER_SUPPORT_ROS_DISTRO_MAP[@]} + 1 ))  # colistener
+total_downloads=$((total_downloads + (${#SUPPORT_COBRIDGE_ARCH[@]} - 1) * ${#COBRIDGE_SUPPORT_ROS_DISTRO_MAP[@]} + 1 ))      # cobridge
 current_download=0
 
 # Debug information
@@ -265,7 +274,8 @@ if [ "${VERBOSE}" = "true" ]; then
   log_info "SUPPORT_OS: ${#SUPPORT_OS[@]} items"
   log_info "SUPPORT_COS_ARCH: ${#SUPPORT_COS_ARCH[@]} items"
   log_info "SUPPORT_COLISTENER_ARCH: ${#SUPPORT_COLISTENER_ARCH[@]} items"
-  log_info "SUPPORT_ROS_VERSION: ${#SUPPORT_ROS_DISTRO_MAP[@]} items"
+  log_info "SUPPORT_COLISTENER_ROS_VERSION: ${#COLISTENER_SUPPORT_ROS_DISTRO_MAP[@]} items"
+  log_info "SUPPORT_COBRIDGE_ROS_VERSION: ${#COBRIDGE_SUPPORT_ROS_DISTRO_MAP[@]} items"
 fi
 
 # Download mesh and trzsz
@@ -347,19 +357,19 @@ for arch in "${SUPPORT_COLISTENER_ARCH[@]}"; do
     colistener_download_url=${COLISTENER_BASE_URL}/${ubuntu_distro}/main/binary-${arch}/ros-indigo-colistener_${COLISTENER_VERSION}${ubuntu_distro}_${arch}.deb
 
     current_download=$((current_download + 1))
-    show_progress ${current_download} ${total_downloads} "Downloading Colistener"
+    show_progress ${current_download} ${total_downloads} "Downloading coListener"
     if ! download_with_retry "${colistener_download_url}" "${colistener_folder}/ros-indigo-colistener_${ubuntu_distro}_${arch}.deb"; then
       continue
     fi
   else
-    for ros_distro in "${!SUPPORT_ROS_DISTRO_MAP[@]}"; do
-      ubuntu_distro=${SUPPORT_ROS_DISTRO_MAP[${ros_distro}]}
+    for ros_distro in "${!COLISTENER_SUPPORT_ROS_DISTRO_MAP[@]}"; do
+      ubuntu_distro=${COLISTENER_SUPPORT_ROS_DISTRO_MAP[${ros_distro}]}
       colistener_folder="${TEMP_DIR}/colistener/${ubuntu_distro}/${arch}/${ros_distro}"
       mkdir -p "${colistener_folder}"
       colistener_download_url=${COLISTENER_BASE_URL}/${ubuntu_distro}/main/binary-${arch}/ros-${ros_distro}-colistener_${COLISTENER_VERSION}${ubuntu_distro}_${arch}.deb
 
       current_download=$((current_download + 1))
-      show_progress ${current_download} ${total_downloads} "Downloading Colistener"
+      show_progress ${current_download} ${total_downloads} "Downloading coListener"
       if ! download_with_retry "${colistener_download_url}" "${colistener_folder}/ros-${ros_distro}-colistener_${ubuntu_distro}_${arch}.deb"; then
         continue
       fi
@@ -369,7 +379,7 @@ done
 
 # Download cobridge packages
 log_info "Downloading cobridge packages..."
-for arch in "${SUPPORT_COLISTENER_ARCH[@]}"; do
+for arch in "${SUPPORT_COBRIDGE_ARCH[@]}"; do
   if [ "${arch}" == "armhf" ]; then
     ubuntu_distro="trusty"
     cobridge_folder="${TEMP_DIR}/cobridge/${ubuntu_distro}/${arch}/indigo"
@@ -377,19 +387,19 @@ for arch in "${SUPPORT_COLISTENER_ARCH[@]}"; do
     cobridge_download_url=${COLISTENER_BASE_URL}/${ubuntu_distro}/main/binary-${arch}/ros-indigo-cobridge_${COBRIDGE_VERSION}${ubuntu_distro}_${arch}.deb
 
     current_download=$((current_download + 1))
-    show_progress ${current_download} ${total_downloads} "Downloading cobridge"
-    if ! download_with_retry "${cobridge_download_url}" "${cobridge_folder}/ros-indigo-colistener_${ubuntu_distro}_${arch}.deb"; then
+    show_progress ${current_download} ${total_downloads} "Downloading coBridge"
+    if ! download_with_retry "${cobridge_download_url}" "${cobridge_folder}/ros-indigo-cobridge_${ubuntu_distro}_${arch}.deb"; then
       continue
     fi
   else
-    for ros_distro in "${!SUPPORT_ROS_DISTRO_MAP[@]}"; do
-      ubuntu_distro=${SUPPORT_ROS_DISTRO_MAP[${ros_distro}]}
+    for ros_distro in "${!COBRIDGE_SUPPORT_ROS_DISTRO_MAP[@]}"; do
+      ubuntu_distro=${COBRIDGE_SUPPORT_ROS_DISTRO_MAP[${ros_distro}]}
       cobridge_folder="${TEMP_DIR}/cobridge/${ubuntu_distro}/${arch}/${ros_distro}"
       mkdir -p "${cobridge_folder}"
       cobridge_download_url=${COLISTENER_BASE_URL}/${ubuntu_distro}/main/binary-${arch}/ros-${ros_distro}-cobridge_${COBRIDGE_VERSION}${ubuntu_distro}_${arch}.deb
 
       current_download=$((current_download + 1))
-      show_progress ${current_download} ${total_downloads} "Downloading cobridge"
+      show_progress ${current_download} ${total_downloads} "Downloading coBridge"
       if ! download_with_retry "${cobridge_download_url}" "${cobridge_folder}/ros-${ros_distro}-cobridge_${ubuntu_distro}_${arch}.deb"; then
         continue
       fi
