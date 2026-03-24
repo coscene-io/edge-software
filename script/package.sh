@@ -31,7 +31,7 @@ SCRIPT_VERSION="1.0.0"
 # Default values
 COLINK_VERSION="1.0.5"
 COS_VERSION="v1.1.14"
-COLISTENER_VERSION="2.2.0-0"
+COLISTENER_VERSION="2.3.0-0"
 COBRIDGE_VERSION="1.1.2-0"
 TRZSZ_VERSION="1.1.6"
 RELEASE_VERSION="unknown"
@@ -161,6 +161,7 @@ SUPPORT_ROS_DISTRO_MAP["noetic"]="focal"
 SUPPORT_ROS_DISTRO_MAP["foxy"]="focal"
 SUPPORT_ROS_DISTRO_MAP["humble"]="jammy"
 SUPPORT_ROS_DISTRO_MAP["melodic"]="bionic"
+SUPPORT_ROS_DISTRO_MAP["jazzy"]="noble"
 # SUPPORT_ROS_DISTRO_MAP["indigo"]="trusty"
 
 MESH_BASE_URL=https://coscene-download.oss-cn-hangzhou.aliyuncs.com
