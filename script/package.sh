@@ -33,6 +33,7 @@ COLINK_VERSION="1.0.4"
 COS_VERSION="v1.1.10"
 COLISTENER_VERSION="2.2.0-0"
 COBRIDGE_VERSION="1.1.2-0"
+COENCODER_VERSION="1.2.6-0"
 TRZSZ_VERSION="1.1.6"
 RELEASE_VERSION="unknown"
 OUTPUT_DIR="${HOME}"
@@ -51,8 +52,9 @@ ${YELLOW}Usage:${NC}
 ${YELLOW}Options:${NC}
   --cos_version=VERSION        Set COS version (default: ${COS_VERSION})
   --colink_version=VERSION     Set Colink version (default: ${COLINK_VERSION})
-  --colistener_version=VERSION Set Colistener version (default: ${COLISTENER_VERSION})
-  --cobridge_version=VERSION   Set Cobridge version (default: ${COBRIDGE_VERSION})
+  --colistener_version=VERSION Set coListener version (default: ${COLISTENER_VERSION})
+  --cobridge_version=VERSION   Set coBridge version (default: ${COBRIDGE_VERSION})
+  --coencoder_version=VERSION  Set coEncoder version (default: ${COENCODER_VERSION})
   --trzsz_version=VERSION      Set Trzsz version (default: ${TRZSZ_VERSION})
   --release_version=TAG        Set repository tag (default: ${RELEASE_VERSION})
   --output_dir=PATH            Set output directory (default: ${OUTPUT_DIR})
@@ -63,7 +65,7 @@ ${YELLOW}Options:${NC}
 
 ${YELLOW}Examples:${NC}
   ${SCRIPT_NAME} --cos_version=1.2.3
-  ${SCRIPT_NAME} --colistener_version=1.0.2-0 --cobridge_version=1.0.9-0
+  ${SCRIPT_NAME} --colistener_version=1.0.2-0 --cobridge_version=1.0.9-0 --coencoder_version=1.2.0-0
   ${SCRIPT_NAME} --output_dir=/tmp/packages --verbose
   ${SCRIPT_NAME} --dry-run
 
@@ -156,16 +158,32 @@ SUPPORT_COS_ARCH=("amd64" "arm64" "arm")
 SUPPORT_MESH_ARCH=("amd64" "aarch64")
 
 SUPPORT_COLISTENER_ARCH=("amd64" "arm64" "armhf")
-declare -A SUPPORT_ROS_DISTRO_MAP
-SUPPORT_ROS_DISTRO_MAP["noetic"]="focal"
-SUPPORT_ROS_DISTRO_MAP["foxy"]="focal"
-SUPPORT_ROS_DISTRO_MAP["humble"]="jammy"
-SUPPORT_ROS_DISTRO_MAP["melodic"]="bionic"
-# SUPPORT_ROS_DISTRO_MAP["indigo"]="trusty"
+SUPPORT_COBRIDGE_ARCH=("amd64" "arm64" "armhf")
+SUPPORT_COENCODER_ARCH=("amd64" "arm64")
+
+declare -A COLISTENER_SUPPORT_ROS_DISTRO_MAP
+COLISTENER_SUPPORT_ROS_DISTRO_MAP["noetic"]="focal"
+COLISTENER_SUPPORT_ROS_DISTRO_MAP["foxy"]="focal"
+COLISTENER_SUPPORT_ROS_DISTRO_MAP["humble"]="jammy"
+COLISTENER_SUPPORT_ROS_DISTRO_MAP["melodic"]="bionic"
+# COLISTENER_SUPPORT_ROS_DISTRO_MAP["indigo"]="trusty"
+
+declare -A COBRIDGE_SUPPORT_ROS_DISTRO_MAP
+COBRIDGE_SUPPORT_ROS_DISTRO_MAP["melodic"]="bionic"
+COBRIDGE_SUPPORT_ROS_DISTRO_MAP["noetic"]="focal"
+COBRIDGE_SUPPORT_ROS_DISTRO_MAP["foxy"]="focal"
+COBRIDGE_SUPPORT_ROS_DISTRO_MAP["humble"]="jammy"
+COBRIDGE_SUPPORT_ROS_DISTRO_MAP["jazzy"]="noble"
+# COBRIDGE_SUPPORT_ROS_DISTRO_MAP["indigo"]="trusty"
+
+declare -A COENCODER_SUPPORT_ROS_DISTRO_MAP
+COENCODER_SUPPORT_ROS_DISTRO_MAP["noetic"]="focal"
+COENCODER_SUPPORT_ROS_DISTRO_MAP["humble"]="jammy"
+COENCODER_SUPPORT_ROS_DISTRO_MAP["jazzy"]="noble"
 
 MESH_BASE_URL=https://coscene-download.oss-cn-hangzhou.aliyuncs.com
 COS_BASE_URL=https://coscene-download.oss-cn-hangzhou.aliyuncs.com/coscout/v2
-COLISTENER_BASE_URL=https://coscene-apt.oss-cn-hangzhou.aliyuncs.com/dists
+COSCENE_APT_URL=https://coscene-apt.oss-cn-hangzhou.aliyuncs.com/dists
 
 # get user input
 while test $# -gt 0; do
@@ -184,6 +202,10 @@ while test $# -gt 0; do
     ;;
   --cobridge_version=*)
     COBRIDGE_VERSION="${1#*=}"
+    shift
+    ;;
+  --coencoder_version=*)
+    COENCODER_VERSION="${1#*=}"
     shift
     ;;
   --trzsz_version=*)
@@ -231,9 +253,10 @@ fi
 # Show configuration
 log_info "Configuration:"
 log_info "  COS Version: ${COS_VERSION}"
-log_info "  Colink Version: ${COLINK_VERSION}"
-log_info "  Colistener Version: ${COLISTENER_VERSION}"
-log_info "  Cobridge Version: ${COBRIDGE_VERSION}"
+log_info "  coLink Version: ${COLINK_VERSION}"
+log_info "  coListener Version: ${COLISTENER_VERSION}"
+log_info "  coBridge Version: ${COBRIDGE_VERSION}"
+log_info "  coEncoder Version: ${COENCODER_VERSION}"
 log_info "  Trzsz Version: ${TRZSZ_VERSION}"
 log_info "  Repository Tag: ${RELEASE_VERSION}"
 log_info "  Output Directory: ${OUTPUT_DIR}"
@@ -253,8 +276,9 @@ total_downloads=0
 total_downloads=$((total_downloads + ${#SUPPORT_MESH_ARCH[@]} * 2))  # mesh + trzsz
 total_downloads=$((total_downloads + ${#SUPPORT_OS[@]} * ${#SUPPORT_COS_ARCH[@]} * 2))  # cos + metadata
 total_downloads=$((total_downloads + 3 * ${#SUPPORT_OS[@]}))  # cgroup files for arm
-total_downloads=$((total_downloads + ${#SUPPORT_COLISTENER_ARCH[@]} * ${#SUPPORT_ROS_DISTRO_MAP[@]}))  # colistener
-total_downloads=$((total_downloads + ${#SUPPORT_COLISTENER_ARCH[@]} * ${#SUPPORT_ROS_DISTRO_MAP[@]}))  # cobridge
+total_downloads=$((total_downloads + (${#SUPPORT_COLISTENER_ARCH[@]} - 1) * ${#COLISTENER_SUPPORT_ROS_DISTRO_MAP[@]} + 1 ))  # colistener
+total_downloads=$((total_downloads + (${#SUPPORT_COBRIDGE_ARCH[@]} - 1) * ${#COBRIDGE_SUPPORT_ROS_DISTRO_MAP[@]} + 1 ))      # cobridge
+total_downloads=$((total_downloads + ${#SUPPORT_COENCODER_ARCH[@]} * ${#COENCODER_SUPPORT_ROS_DISTRO_MAP[@]}))               # coencoder
 current_download=0
 
 # Debug information
@@ -264,7 +288,11 @@ if [ "${VERBOSE}" = "true" ]; then
   log_info "SUPPORT_OS: ${#SUPPORT_OS[@]} items"
   log_info "SUPPORT_COS_ARCH: ${#SUPPORT_COS_ARCH[@]} items"
   log_info "SUPPORT_COLISTENER_ARCH: ${#SUPPORT_COLISTENER_ARCH[@]} items"
-  log_info "SUPPORT_ROS_VERSION: ${#SUPPORT_ROS_DISTRO_MAP[@]} items"
+  log_info "SUPPORT_COBRIDGE_ARCH: ${#SUPPORT_COBRIDGE_ARCH[@]} items"
+  log_info "SUPPORT_COENCODER_ARCH: ${#SUPPORT_COENCODER_ARCH[@]} items"
+  log_info "COLISTENER_SUPPORT_ROS_VERSION: ${#COLISTENER_SUPPORT_ROS_DISTRO_MAP[@]} items"
+  log_info "COBRIDGE_SUPPORT_ROS_VERSION: ${#COBRIDGE_SUPPORT_ROS_DISTRO_MAP[@]} items"
+  log_info "COENCODER_SUPPORT_ROS_VERSION: ${#COENCODER_SUPPORT_ROS_DISTRO_MAP[@]} items"
 fi
 
 # Download mesh and trzsz
@@ -343,7 +371,7 @@ for arch in "${SUPPORT_COLISTENER_ARCH[@]}"; do
     ubuntu_distro="trusty"
     colistener_folder="${TEMP_DIR}/colistener/${ubuntu_distro}/${arch}/indigo"
     mkdir -p "${colistener_folder}"
-    colistener_download_url=${COLISTENER_BASE_URL}/${ubuntu_distro}/main/binary-${arch}/ros-indigo-colistener_${COLISTENER_VERSION}${ubuntu_distro}_${arch}.deb
+    colistener_download_url=${COSCENE_APT_URL}/${ubuntu_distro}/main/binary-${arch}/ros-indigo-colistener_${COLISTENER_VERSION}${ubuntu_distro}_${arch}.deb
 
     current_download=$((current_download + 1))
     show_progress ${current_download} ${total_downloads} "Downloading Colistener"
@@ -351,11 +379,11 @@ for arch in "${SUPPORT_COLISTENER_ARCH[@]}"; do
       continue
     fi
   else
-    for ros_distro in "${!SUPPORT_ROS_DISTRO_MAP[@]}"; do
-      ubuntu_distro=${SUPPORT_ROS_DISTRO_MAP[${ros_distro}]}
+    for ros_distro in "${!COLISTENER_SUPPORT_ROS_DISTRO_MAP[@]}"; do
+      ubuntu_distro=${COLISTENER_SUPPORT_ROS_DISTRO_MAP[${ros_distro}]}
       colistener_folder="${TEMP_DIR}/colistener/${ubuntu_distro}/${arch}/${ros_distro}"
       mkdir -p "${colistener_folder}"
-      colistener_download_url=${COLISTENER_BASE_URL}/${ubuntu_distro}/main/binary-${arch}/ros-${ros_distro}-colistener_${COLISTENER_VERSION}${ubuntu_distro}_${arch}.deb
+      colistener_download_url=${COSCENE_APT_URL}/${ubuntu_distro}/main/binary-${arch}/ros-${ros_distro}-colistener_${COLISTENER_VERSION}${ubuntu_distro}_${arch}.deb
 
       current_download=$((current_download + 1))
       show_progress ${current_download} ${total_downloads} "Downloading Colistener"
@@ -368,24 +396,24 @@ done
 
 # Download cobridge packages
 log_info "Downloading cobridge packages..."
-for arch in "${SUPPORT_COLISTENER_ARCH[@]}"; do
+for arch in "${SUPPORT_COBRIDGE_ARCH[@]}"; do
   if [ "${arch}" == "armhf" ]; then
     ubuntu_distro="trusty"
     cobridge_folder="${TEMP_DIR}/cobridge/${ubuntu_distro}/${arch}/indigo"
     mkdir -p "${cobridge_folder}"
-    cobridge_download_url=${COLISTENER_BASE_URL}/${ubuntu_distro}/main/binary-${arch}/ros-indigo-cobridge_${COBRIDGE_VERSION}${ubuntu_distro}_${arch}.deb
+    cobridge_download_url=${COSCENE_APT_URL}/${ubuntu_distro}/main/binary-${arch}/ros-indigo-cobridge_${COBRIDGE_VERSION}${ubuntu_distro}_${arch}.deb
 
     current_download=$((current_download + 1))
     show_progress ${current_download} ${total_downloads} "Downloading cobridge"
-    if ! download_with_retry "${cobridge_download_url}" "${cobridge_folder}/ros-indigo-colistener_${ubuntu_distro}_${arch}.deb"; then
+    if ! download_with_retry "${cobridge_download_url}" "${cobridge_folder}/ros-indigo-cobridge_${ubuntu_distro}_${arch}.deb"; then
       continue
     fi
   else
-    for ros_distro in "${!SUPPORT_ROS_DISTRO_MAP[@]}"; do
-      ubuntu_distro=${SUPPORT_ROS_DISTRO_MAP[${ros_distro}]}
+    for ros_distro in "${!COBRIDGE_SUPPORT_ROS_DISTRO_MAP[@]}"; do
+      ubuntu_distro=${COBRIDGE_SUPPORT_ROS_DISTRO_MAP[${ros_distro}]}
       cobridge_folder="${TEMP_DIR}/cobridge/${ubuntu_distro}/${arch}/${ros_distro}"
       mkdir -p "${cobridge_folder}"
-      cobridge_download_url=${COLISTENER_BASE_URL}/${ubuntu_distro}/main/binary-${arch}/ros-${ros_distro}-cobridge_${COBRIDGE_VERSION}${ubuntu_distro}_${arch}.deb
+      cobridge_download_url=${COSCENE_APT_URL}/${ubuntu_distro}/main/binary-${arch}/ros-${ros_distro}-cobridge_${COBRIDGE_VERSION}${ubuntu_distro}_${arch}.deb
 
       current_download=$((current_download + 1))
       show_progress ${current_download} ${total_downloads} "Downloading cobridge"
@@ -394,6 +422,23 @@ for arch in "${SUPPORT_COLISTENER_ARCH[@]}"; do
       fi
     done
   fi
+done
+
+# Download coencoder packages
+log_info "Downloading coencoder packages..."
+for arch in "${SUPPORT_COENCODER_ARCH[@]}"; do
+  for ros_distro in "${!COENCODER_SUPPORT_ROS_DISTRO_MAP[@]}"; do
+      ubuntu_distro=${COENCODER_SUPPORT_ROS_DISTRO_MAP[${ros_distro}]}
+      coencoder_folder="${TEMP_DIR}/coencoder/${ubuntu_distro}/${arch}/${ros_distro}"
+      mkdir -p "${coencoder_folder}"
+      coencoder_download_url=${COSCENE_APT_URL}/${ubuntu_distro}/main/binary-${arch}/ros-${ros_distro}-coencoder_${COENCODER_VERSION}${ubuntu_distro}_${arch}.deb
+
+      current_download=$((current_download + 1))
+      show_progress ${current_download} ${total_downloads} "Downloading coencoder"
+      if ! download_with_retry "${coencoder_download_url}" "${coencoder_folder}/ros-${ros_distro}-cobridge_${ubuntu_distro}_${arch}.deb"; then
+        continue
+      fi
+    done
 done
 
 # Generate version.yaml file
@@ -410,6 +455,7 @@ assemblies:
   cos_version: ${COS_VERSION}
   colistener_version: ${COLISTENER_VERSION}
   cobridge_version: ${COBRIDGE_VERSION}
+  coencoder_version: ${COENCODER_VERSION}
   trzsz_version: ${TRZSZ_VERSION}
 EOF
 

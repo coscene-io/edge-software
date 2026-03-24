@@ -196,6 +196,15 @@ else
     echo "coListener not installed, skipping"
 fi
 
+echo "Checking coEncoder..."
+if dpkg -l | grep "ros-${ROS_VERSION}-coencoder" > /dev/null; then
+    echo "Uninstalling coEncoder..."
+    sudo dpkg -r ros-${ROS_VERSION}-coencoder >/dev/null 2>&1 || echo "Failed to uninstall coEncoder"
+    echo "coEncoder uninstalled"
+else
+    echo "coEncoder not installed, skipping"
+fi
+
 echo "Uninstallation completed 🎉"
 exit 0
 

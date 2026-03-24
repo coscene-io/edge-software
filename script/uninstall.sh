@@ -196,5 +196,14 @@ else
     echo "coListener 未安装，跳过"
 fi
 
+echo "正在检查 coEncoder..."
+if dpkg -l | grep "ros-${ROS_VERSION}-coencoder" > /dev/null; then
+    echo "正在卸载 coEncoder..."
+    sudo dpkg -r ros-${ROS_VERSION}-coencoder >/dev/null 2>&1 || echo "卸载 coEncoder 失败"
+    echo "coEncoder 卸载完成"
+else
+    echo "coEncoder 未安装，跳过"
+fi
+
 echo "卸载完成 🎉"
 exit 0

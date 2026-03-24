@@ -147,6 +147,7 @@ SKIP_VERIFY_CERT=0
 COLINK_ENDPOINT=""
 INSTALL_COLISTENER=0
 INSTALL_COBRIDGE=0
+INSTALL_COENCODER=0
 HTTP_PROXY=""
 NO_PROXY="localhost,127.0.0.1,::1,.local,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
 
@@ -185,8 +186,9 @@ For systemd systems, please use install.sh instead.
     --coLink_network        coLink network id, e.g. organization id, will skip if not provided
     --use_32bit             Use 32-bit version for cos
     --skip_verify_cert      Skip verify certificate when download files
-    --install_colistener    Install colistener component (default: false)
-    --install_cobridge      Install cobridge component (default: false)
+    --install_colistener    Install coListener component (default: false)
+    --install_cobridge      Install coBridge component (default: false)
+    --install_coencoder     Install coEncoder component (default: false)
     --http_proxy            Set HTTP proxy for cos service (e.g. http://proxy.example.com:8080)
     --version               Show the version of the cos
 EOF
@@ -315,6 +317,10 @@ while test $# -gt 0; do
     ;;
   --install_cobridge)
     INSTALL_COBRIDGE=1
+    shift # past argument
+    ;;
+  --install_coencoder)
+    INSTALL_COENCODER=1
     shift # past argument
     ;;
   --http_proxy=*)
@@ -824,7 +830,7 @@ else
 fi
 
 # Install cobridge and colistener based on flags
-if [[ $INSTALL_COBRIDGE -eq 1 ]] || [[ $INSTALL_COLISTENER -eq 1 ]]; then
+if [[ $INSTALL_COBRIDGE -eq 1 ]] || [[ $INSTALL_COLISTENER -eq 1 ]] || [[ $INSTALL_COENCODER -eq 1]]; then
   get_ubuntu_distro() {
     # in keenon's ubuntu14.04, /etc/os-release file exists, but `VERSION_CODENAME` and `UBUNTU_CODENAME` not found.
     # so, check /etc/lsb-release first, if file not exists, fallback to /etc/os-release.
@@ -868,6 +874,7 @@ fi
 
 COLISTENER_VERSION="none"
 COBRIDGE_VERSION="none"
+COENCODER_VERSION="none"
 
 if [[ $INSTALL_COBRIDGE -eq 1 ]]; then
   echo "Install coListener"
@@ -894,6 +901,20 @@ if [[ $INSTALL_COLISTENER -eq 1 ]]; then
     COBRIDGE_DOWNLOAD_URL="${APT_BASE_URL}/dists/${UBUNTU_DISTRO}/main/binary-${ROS_NODE_ARCH}/${COBRIDGE_DEB_FILE}"
     download_file "$TEMP_DIR"/cobridge.deb $COBRIDGE_DOWNLOAD_URL $SKIP_VERIFY_CERT
     sudo dpkg -i "$TEMP_DIR"/cobridge.deb
+  fi
+fi
+
+if [[ $INSTALL_COENCODER -eq 1 ]]; then
+  echo "Install coEncoder"
+  if [[ -n $USE_LOCAL ]]; then
+    COENCODER_DEB_FILE="ros-${ROS_VERSION}-coencoder_${UBUNTU_DISTRO}_${ROS_NODE_ARCH}.deb"
+    sudo dpkg -i "$TEMP_DIR/cos_binaries/coencoder/${UBUNTU_DISTRO}/${ROS_NODE_ARCH}/${ROS_VERSION}/${COENCODER_DEB_FILE}"
+  else
+    COENCODER_VERSION="1.2.6-0"
+    COENCODER_DEB_FILE="ros-${ROS_VERSION}-coencoder_${COENCODER_VERSION}${UBUNTU_DISTRO}_${ROS_NODE_ARCH}.deb"
+    COENCODER_DOWNLOAD_URL="${APT_BASE_URL}/dists/${UBUNTU_DISTRO}/main/binary-${ROS_NODE_ARCH}/${COENCODER_DEB_FILE}"
+    download_file "$TEMP_DIR"/coencoder.deb $COENCODER_DOWNLOAD_URL $SKIP_VERIFY_CERT
+    sudo dpkg -i "$TEMP_DIR"/coencoder.deb
   fi
 fi
 
